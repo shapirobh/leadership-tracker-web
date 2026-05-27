@@ -4,8 +4,87 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leadership Tracker — Folder Picker</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding: 40px 20px; }
+        #status { margin: 20px 0; color: #666; }
+        #error { color: #EA4335; margin: 20px 0; display: none; }
+    </style>
 </head>
 <body>
-    <p>Google Drive Folder Picker — full implementation coming in M4.</p>
+    <h2>Select a Folder</h2>
+    <p id="status">Loading Google Picker...</p>
+    <p id="error"></p>
+
+    <script>
+        var APP_SCHEME = 'com.bshapiro.leadershiptracker';
+
+        function getHashParams() {
+            var hash = window.location.hash.substring(1);
+            var params = {};
+            hash.split('&').forEach(function(pair) {
+                var parts = pair.split('=');
+                if (parts.length === 2) {
+                    params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1]);
+                }
+            });
+            return params;
+        }
+
+        function showError(msg) {
+            document.getElementById('status').style.display = 'none';
+            var el = document.getElementById('error');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        function redirectToApp(params) {
+            var query = Object.keys(params).map(function(k) {
+                return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+            }).join('&');
+            window.location.href = APP_SCHEME + '://folder?' + query;
+        }
+
+        var hashParams = getHashParams();
+        var accessToken = hashParams.token;
+        var apiKey = hashParams.apiKey;
+        var appId = hashParams.appId;
+
+        if (!accessToken || !apiKey || !appId) {
+            showError('Missing required parameters. Please launch the picker from the app.');
+        } else {
+            var script = document.createElement('script');
+            script.src = 'https://apis.google.com/js/api.js';
+            script.onload = function() { gapi.load('picker', onPickerApiLoaded); };
+            script.onerror = function() { showError('Failed to load Google APIs.'); };
+            document.body.appendChild(script);
+        }
+
+        function onPickerApiLoaded() {
+            document.getElementById('status').textContent = 'Opening folder picker...';
+
+            var picker = new google.picker.PickerBuilder()
+                .setAppId(appId)
+                .setOAuthToken(accessToken)
+                .setDeveloperKey(apiKey)
+                .addView(new google.picker.DocsView()
+                    .setIncludeFolders(true)
+                    .setSelectFolderEnabled(true)
+                    .setMimeTypes('application/vnd.google-apps.folder'))
+                .setCallback(pickerCallback)
+                .setTitle('Select a Leadership Tracker folder')
+                .build();
+
+            picker.setVisible(true);
+        }
+
+        function pickerCallback(data) {
+            if (data.action === google.picker.Action.PICKED) {
+                var folder = data.docs[0];
+                redirectToApp({ id: folder.id, name: folder.name });
+            } else if (data.action === google.picker.Action.CANCEL) {
+                redirectToApp({ cancelled: '1' });
+            }
+        }
+    </script>
 </body>
 </html>
