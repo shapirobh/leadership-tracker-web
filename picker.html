@@ -3,17 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leadership Tracker — Folder Picker</title>
+    <title>Leadership Tracker — Select a Folder</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding: 40px 20px; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            text-align: center;
+            padding: 40px 20px;
+            max-width: 480px;
+            margin: 0 auto;
+            color: #333;
+        }
+        h2 { margin-bottom: 8px; }
+        .instructions {
+            text-align: left;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin: 20px 0;
+            line-height: 1.6;
+        }
+        .instructions p { margin: 8px 0; }
+        .instructions strong { color: #1a73e8; }
         #status { margin: 20px 0; color: #666; }
         #error { color: #EA4335; margin: 20px 0; display: none; }
+        .note {
+            font-size: 13px;
+            color: #666;
+            margin-top: 16px;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
     <h2>Select a Folder</h2>
-    <p id="status">Loading Google Picker...</p>
+    <p>Choose the Google Drive folder where Leadership Tracker will store its data.</p>
+
+    <div class="instructions">
+        <p><strong>Important:</strong> Select a folder that is dedicated to Leadership Tracker.</p>
+        <p>If you haven't created one yet, you can create a new folder directly in the picker
+        by clicking the "New Folder" button (folder icon with a +).</p>
+        <p>The folder should be empty and shared only with members of your bishopric or
+        stake presidency.</p>
+    </div>
+
+    <p id="status">Loading folder picker...</p>
     <p id="error"></p>
+    <p class="note">After selecting a folder, you will be returned to the app automatically.</p>
 
     <script>
         var APP_SCHEME = 'com.bshapiro.leadershiptracker';
@@ -50,12 +85,12 @@
         var appId = hashParams.appId;
 
         if (!accessToken || !apiKey || !appId) {
-            showError('Missing required parameters. Please launch the picker from the app.');
+            showError('Missing required parameters. Please launch the folder picker from within the Leadership Tracker app.');
         } else {
             var script = document.createElement('script');
             script.src = 'https://apis.google.com/js/api.js';
             script.onload = function() { gapi.load('picker', onPickerApiLoaded); };
-            script.onerror = function() { showError('Failed to load Google APIs.'); };
+            script.onerror = function() { showError('Failed to load Google APIs. Please check your internet connection and try again.'); };
             document.body.appendChild(script);
         }
 
