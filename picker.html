@@ -7,48 +7,73 @@
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            text-align: center;
-            padding: 40px 20px;
+            padding: 32px 20px;
             max-width: 480px;
             margin: 0 auto;
             color: #333;
         }
-        h2 { margin-bottom: 8px; }
-        .instructions {
-            text-align: left;
+        h2 { text-align: center; margin-bottom: 16px; }
+        .intro { text-align: center; color: #555; margin-bottom: 24px; line-height: 1.5; }
+        .steps {
             background: #f8f9fa;
             border-radius: 8px;
             padding: 16px 20px;
-            margin: 20px 0;
+            margin-bottom: 24px;
             line-height: 1.6;
         }
-        .instructions p { margin: 8px 0; }
-        .instructions strong { color: #1a73e8; }
-        #status { margin: 20px 0; color: #666; }
-        #error { color: #EA4335; margin: 20px 0; display: none; }
-        .note {
-            font-size: 13px;
-            color: #666;
-            margin-top: 16px;
+        .steps p { margin: 10px 0; }
+        .steps strong { color: #1a73e8; }
+        .warning {
+            background: #fff8e1;
+            border-left: 4px solid #f5b400;
+            border-radius: 4px;
+            padding: 12px 16px;
+            margin-bottom: 24px;
+            font-size: 14px;
             line-height: 1.5;
         }
+        .btn-container { text-align: center; margin: 24px 0; }
+        .btn {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            min-width: 240px;
+        }
+        .btn:active { background: #1557b0; }
+        .btn:disabled { background: #ccc; cursor: default; }
+        #status { text-align: center; margin: 16px 0; color: #666; display: none; }
+        #error { color: #EA4335; text-align: center; margin: 16px 0; display: none; }
     </style>
 </head>
 <body>
-    <h2>Select a Folder</h2>
-    <p>Choose the Google Drive folder where Leadership Tracker will store its data.</p>
+    <h2>Select Your Folder</h2>
+    <p class="intro">Choose the Google Drive folder where Leadership Tracker will store
+    your callings, interviews, and meeting data.</p>
 
-    <div class="instructions">
-        <p><strong>Important:</strong> Select a folder that is dedicated to Leadership Tracker.</p>
-        <p>If you haven't created one yet, you can create a new folder directly in the picker
-        by clicking the "New Folder" button (folder icon with a +).</p>
-        <p>The folder should be empty and shared only with members of your bishopric or
-        stake presidency.</p>
+    <div class="steps">
+        <p><strong>If you haven't created a folder yet:</strong></p>
+        <p>1. Open <a href="https://drive.google.com" target="_blank">Google Drive</a> in a
+        new tab.</p>
+        <p>2. Create a new, empty folder (e.g., "Ward Leadership" or "Stake Presidency").</p>
+        <p>3. Right-click the folder, select "Share," and add each member of your bishopric
+        or presidency as an Editor.</p>
+        <p>4. Come back to this page and tap the button below to select that folder.</p>
     </div>
 
-    <p id="status">Loading folder picker...</p>
+    <div class="warning">
+        <strong>Important:</strong> Only share the folder with named accounts of your
+        leadership team members. Never set it to "Anyone with the link."
+    </div>
+
+    <div class="btn-container">
+        <button id="openPickerBtn" class="btn" disabled>Loading...</button>
+    </div>
+    <p id="status"></p>
     <p id="error"></p>
-    <p class="note">After selecting a folder, you will be returned to the app automatically.</p>
 
     <script>
         var APP_SCHEME = 'com.bshapiro.leadershiptracker';
@@ -70,6 +95,9 @@
             var el = document.getElementById('error');
             el.textContent = msg;
             el.style.display = 'block';
+            var btn = document.getElementById('openPickerBtn');
+            btn.disabled = true;
+            btn.textContent = 'Error';
         }
 
         function redirectToApp(params) {
@@ -85,18 +113,25 @@
         var appId = hashParams.appId;
 
         if (!accessToken || !apiKey || !appId) {
-            showError('Missing required parameters. Please launch the folder picker from within the Leadership Tracker app.');
+            showError('Missing required parameters. Please open this page from within the Leadership Tracker app.');
         } else {
             var script = document.createElement('script');
             script.src = 'https://apis.google.com/js/api.js';
-            script.onload = function() { gapi.load('picker', onPickerApiLoaded); };
-            script.onerror = function() { showError('Failed to load Google APIs. Please check your internet connection and try again.'); };
+            script.onload = function() {
+                gapi.load('picker', function() {
+                    var btn = document.getElementById('openPickerBtn');
+                    btn.disabled = false;
+                    btn.textContent = 'Open Folder Picker';
+                    btn.onclick = openPicker;
+                });
+            };
+            script.onerror = function() {
+                showError('Failed to load Google APIs. Check your internet connection and try again.');
+            };
             document.body.appendChild(script);
         }
 
-        function onPickerApiLoaded() {
-            document.getElementById('status').textContent = 'Opening folder picker...';
-
+        function openPicker() {
             var picker = new google.picker.PickerBuilder()
                 .setAppId(appId)
                 .setOAuthToken(accessToken)
@@ -106,7 +141,7 @@
                     .setSelectFolderEnabled(true)
                     .setMimeTypes('application/vnd.google-apps.folder'))
                 .setCallback(pickerCallback)
-                .setTitle('Select a Leadership Tracker folder')
+                .setTitle('Select your Leadership Tracker folder')
                 .build();
 
             picker.setVisible(true);
