@@ -20,25 +20,34 @@
 </head>
 <body>
     <h1>Leadership Tracker — Privacy Policy</h1>
-    <p class="updated">Last updated: May 27, 2026</p>
+    <p class="updated">Last updated: June 5, 2026</p>
 
     <h2>Data We Collect</h2>
-    <p>We do not collect any personal data. Leadership Tracker has no backend server and does not transmit your data to us or any third party.</p>
+    <p>We do not collect any personal data. Leadership Tracker has no backend server and does not transmit your data to us or any third party. Everything you enter or import stays on your device and in your own Google Drive folder.</p>
 
     <h2>Where Your Data Lives</h2>
-    <p>All data is stored in your own Google Drive folder. The app reads and writes files solely within the folder you select during setup. We use the <code>drive.file</code> scope, which limits the app's access to only the files and folders it creates or that you explicitly grant it access to.</p>
+    <p>All data is stored in your own Google Drive folder (or, in device-only mode, solely on your device). The app reads and writes files solely within the folder you select during setup. We use the <code>drive.file</code> scope, which limits the app's access to only the files and folders it creates or that you explicitly grant it access to. The app cannot see the rest of your Drive.</p>
+
+    <h2>Member Directory Information (optional)</h2>
+    <p>You may optionally import your unit's member directory — names, and optionally phone numbers and email addresses — from a PDF report you download yourself from the Church's leader resources site. The PDF is parsed <strong>entirely on your device</strong>; the resulting list is stored only in your own Google Drive folder (shared with the leaders you have shared that folder with) and on your device. It is used to suggest names as you type and, if phone/email were included, to open your device's own phone, messaging, or email app when you tap a contact button. This information is never transmitted to us or to any third party. Re-importing replaces the list; deleting your Drive folder removes it entirely.</p>
+
+    <h2>Google Calendar (optional)</h2>
+    <p>If you choose to link a Google calendar, the app requests the <code>calendar.events</code> scope (to create and remove interview appointment events on the calendar you select, and to read that calendar's events so you can see existing appointments while scheduling) and a read-only calendar-list scope (solely to show your calendars in the settings picker). Calendar event data is cached only on your device. The app never touches calendars other than the one you select, and you can unlink the calendar or revoke access at any time.</p>
 
     <h2>Authentication</h2>
-    <p>Leadership Tracker uses Google OAuth 2.0 to authenticate you. Your refresh token is stored securely on your device using the Android Keystore (via Expo SecureStore). We never see, store, or transmit your Google credentials.</p>
+    <p>Leadership Tracker uses native Google Sign-In (OAuth 2.0). Sign-in tokens are managed by Google Play services on your device. We never see, store, or transmit your Google credentials.</p>
+
+    <h2>Notifications (optional)</h2>
+    <p>Reminders, if you turn them on, are scheduled entirely on your device from the data already in your folder. There are no push servers and nothing is transmitted.</p>
 
     <h2>Data Sharing</h2>
-    <p>We do not share any data with third parties. All information remains in your Google Drive under your control.</p>
+    <p>We do not share any data with third parties. All information remains in your Google Drive and on your devices, under your control.</p>
 
     <h2>Shared Folders</h2>
-    <p>Leadership Tracker is designed for use with a shared Google Drive folder among a small leadership group (e.g., a bishopric or stake presidency). <strong>Important:</strong> Share your Leadership Tracker folder only with named Google accounts of authorized members. Never set the folder to "anyone with the link," as this could expose sensitive member information to unintended parties.</p>
+    <p>Leadership Tracker is designed for use with a shared Google Drive folder among a small leadership group (e.g., a bishopric or stake presidency). <strong>Important:</strong> Share your Leadership Tracker folder only with named Google accounts of authorized members. Never set the folder to "anyone with the link," as this could expose sensitive member information to unintended parties. The same caution applies to the Google calendar you link, if any.</p>
 
     <h2>Data Deletion</h2>
-    <p>You can delete any data at any time through the app or directly in Google Drive. Deleted records go to Google Drive's Trash and are permanently removed after 30 days. You can also revoke the app's access at any time through your Google Account settings.</p>
+    <p>You can delete any data at any time through the app or directly in Google Drive. Deleted records go to Google Drive's Trash and are permanently removed after 30 days. You can also revoke the app's Drive and Calendar access at any time through your Google Account settings, and clear the app's on-device data through Android's app settings.</p>
 
     <h2>Changes to This Policy</h2>
     <p>If we update this policy, the revised version will be posted at this URL with an updated date.</p>
