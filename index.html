@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leadership Tracker — Organize callings, interviews, and meeting agendas</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 720px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            line-height: 1.6;
+            color: #333;
+        }
+        h1 { font-size: 1.6rem; }
+        h2 { font-size: 1.2rem; margin-top: 1.75rem; }
+        .hero { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+        .hero img { width: 96px; height: 96px; border-radius: 20px; }
+        .tagline { color: #555; font-size: 1.05rem; margin-top: 0; }
+        .footer-links { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid #ddd; font-size: 0.95rem; }
+        .footer-links a { margin-right: 1.25rem; }
+        ul { padding-left: 1.25rem; }
+        li { margin-bottom: 0.5rem; }
+        .muted { color: #666; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <img src="icon.png" alt="Leadership Tracker app icon">
+        <div>
+            <h1>Leadership Tracker</h1>
+            <p class="tagline">Organize callings, interviews, and meeting agendas — together, in one place.</p>
+        </div>
+    </div>
+
+    <p>Leadership Tracker is a mobile app for local volunteer leadership groups — such as a ward bishopric or
+    stake presidency of The Church of Jesus Christ of Latter-day Saints — to coordinate the work they share.
+    It runs on Android (iOS coming later) and is currently in pre-release testing ahead of its Google Play launch.</p>
+
+    <h2>What the app does</h2>
+    <ul>
+        <li><strong>Callings</strong> — track each calling through its full workflow: leadership approval,
+        the invitation interview, sustaining, setting apart, and the record update, with reminders when a
+        step has waited too long.</li>
+        <li><strong>Interviews</strong> — schedule recurring interviews (with rotation between leaders) and
+        one-time appointments, see everything due on a single worklist, and book times against your team's
+        shared calendar so double-booking is visible before it happens.</li>
+        <li><strong>Meeting agendas</strong> — build sacrament and leadership meeting programs: speakers and
+        topics, prayers, hymns, business items, and a printable agenda PDF.</li>
+        <li><strong>Built for a team</strong> — every member of the leadership group sees the same up-to-date
+        information on their own phone, in their own language (English, Spanish, Portuguese, French).</li>
+    </ul>
+
+    <h2>Your data stays yours</h2>
+    <p>Leadership Tracker has <strong>no backend server</strong> and collects nothing. Everything you enter is
+    stored on your device — or, if you choose shared mode, in a Google Drive folder that <strong>you</strong>
+    create and own, shared only with the people you invite. The app connects to your Google account for
+    exactly two purposes:</p>
+    <ul>
+        <li><strong>Google Drive</strong> — the app stores its data files in the one folder you select. It uses
+        Google's limited <code>drive.file</code> permission, which means it cannot see, touch, or list anything
+        else in your Drive.</li>
+        <li><strong>Google Calendar</strong> — if your team links a calendar, the app writes interview
+        appointments to it and reads it so you can see open time slots while scheduling. It only ever touches
+        the one calendar you select.</li>
+    </ul>
+    <p>No data is ever transmitted to the developer or any third party. You can revoke the app's access at any
+    time from your Google Account settings, and your files remain yours in your own Drive. The app also works
+    fully in a device-only mode with no Google account at all.</p>
+
+    <h2>Documents</h2>
+    <p>
+        <a href="privacy.html">Privacy Policy</a> · <a href="terms.html">Terms of Service</a>
+    </p>
+
+    <h2>Contact</h2>
+    <p>Questions or feedback? Contact <a href="mailto:hazard007@gmail.com">hazard007@gmail.com</a>.</p>
+
+    <p class="muted">Leadership Tracker is independently developed software. It is not affiliated with, endorsed
+    by, or sponsored by The Church of Jesus Christ of Latter-day Saints.</p>
+
+    <div class="footer-links">
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="terms.html">Terms of Service</a>
+    </div>
+</body>
+</html>
