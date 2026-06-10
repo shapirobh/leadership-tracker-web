@@ -218,7 +218,7 @@
             document.getElementById('doneBtn').style.display = 'inline-block';
 
             var metaUrl = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId)
-                + '?supportsAllDrives=true&fields=id,name,ownedByMe,mimeType,owners(displayName,emailAddress)';
+                + '?supportsAllDrives=true&fields=id,name,ownedByMe,mimeType,owners(displayName,emailAddress),capabilities(canEdit,canModifyContent)';
 
             fetch(metaUrl, { headers: { Authorization: 'Bearer ' + accessToken } })
                 .then(function(res) {
@@ -236,17 +236,26 @@
                                 html += line('Owner', (j.owners[0].displayName || '') + ' <' + (j.owners[0].emailAddress || '') + '>');
                             }
                             html += line('ownedByMe', j.ownedByMe);
+                            if (j.capabilities) {
+                                html += line('capabilities.canEdit', j.capabilities.canEdit);
+                                html += line('capabilities.canModifyContent', j.capabilities.canModifyContent);
+                            }
                         } catch (e) {}
                     } else {
                         html += '<pre>' + esc(meta.body) + '</pre>';
                     }
                     out.innerHTML += html;
 
+                    if (!meta.ok) {
+                        finalVerdict(false, false);
+                        return;
+                    }
+
                     var isGoogleNative = mimeType && mimeType.indexOf('application/vnd.google-apps') === 0;
                     if (isGoogleNative) {
                         out.innerHTML += '<h3>Content read</h3>'
                             + line('Skipped', 'Google-native type has no direct downloadable content');
-                        finish(meta.ok, meta.ok ? 'metadata-only' : 'denied');
+                        runWriteTest(fileId, true);
                         return;
                     }
 
@@ -264,27 +273,87 @@
                             h += line('HTTP status', c.status + (c.ok ? '  (OK — CAN READ)' : '  (DENIED)'));
                             h += '<pre>' + esc(c.body.slice(0, 500)) + '</pre>';
                             out.innerHTML += h;
-                            finish(c.ok, c.ok ? 'full-read' : 'denied');
+                            runWriteTest(fileId, c.ok);
                         })
                         .catch(function(e) {
                             out.innerHTML += '<pre>content fetch error: ' + esc(e) + '</pre>';
-                            finish(false, 'error');
+                            runWriteTest(fileId, false);
                         });
                 })
                 .catch(function(e) {
                     out.innerHTML += '<pre>metadata fetch error: ' + esc(e) + '</pre>';
-                    finish(false, 'error');
+                    finalVerdict(false, false);
                 });
         }
 
-        function finish(ok, kind) {
+        // Non-destructive write test: set a temporary custom property, then remove it.
+        // Exercises the same edit permission a content update needs, without touching
+        // the file's actual contents.
+        function runWriteTest(fileId, readOk) {
             var out = document.getElementById('results');
-            var color = ok ? '#188038' : '#EA4335';
-            var label = ok
-                ? '✓ ACCESS GRANTED'
-                : '✗ ACCESS DENIED';
-            out.innerHTML += '<div class="verdict" style="color:' + color + ';"><strong>' + label + '</strong></div>'
-                + line('Result', kind)
+            out.innerHTML += '<h3>Write test (non-destructive)…</h3>';
+
+            var url = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId)
+                + '?supportsAllDrives=true&fields=id,properties';
+
+            fetch(url, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ properties: { ltWriteTest: 'ok' } })
+            })
+                .then(function(res) {
+                    return res.text().then(function(body) {
+                        return { status: res.status, ok: res.ok, body: body };
+                    });
+                })
+                .then(function(w) {
+                    var h = '<h3>Write result (set property)</h3>';
+                    h += line('HTTP status', w.status + (w.ok ? '  (OK — CAN WRITE)' : '  (DENIED)'));
+                    if (!w.ok) h += '<pre>' + esc(w.body) + '</pre>';
+                    out.innerHTML += h;
+                    if (w.ok) { cleanupWriteTest(fileId); }
+                    finalVerdict(readOk, w.ok);
+                })
+                .catch(function(e) {
+                    out.innerHTML += '<pre>write fetch error: ' + esc(e) + '</pre>';
+                    finalVerdict(readOk, false);
+                });
+        }
+
+        // Remove the temporary test property so the file is left exactly as it was.
+        function cleanupWriteTest(fileId) {
+            var url = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId)
+                + '?supportsAllDrives=true&fields=id';
+            fetch(url, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ properties: { ltWriteTest: null } })
+            }).catch(function() {});
+        }
+
+        function finalVerdict(readOk, writeOk) {
+            var out = document.getElementById('results');
+            var bothOk = readOk && writeOk;
+            var color = bothOk ? '#188038' : ((writeOk || readOk) ? '#f5b400' : '#EA4335');
+            var label;
+            if (bothOk) {
+                label = '✓ READ + WRITE — collaboration viable';
+            } else if (readOk && !writeOk) {
+                label = '◑ READ ONLY — cannot update this file';
+            } else if (!readOk && writeOk) {
+                label = '◑ WRITE ONLY — could not read content';
+            } else {
+                label = '✗ NO ACCESS';
+            }
+            out.innerHTML += '<div class="verdict" style="color:' + color + ';"><strong>' + esc(label) + '</strong></div>'
+                + line('Read', readOk ? 'granted' : 'denied')
+                + line('Write', writeOk ? 'granted' : 'denied')
                 + '<p style="text-align:center;color:#666;font-size:13px;">Screenshot this whole page and send it back.</p>';
         }
 
