@@ -76,10 +76,29 @@
     </div>
     <p id="status"></p>
     <p id="error"></p>
+    <pre id="debug" style="display:none;background:#1e1e1e;color:#9cdcfe;font-size:11px;line-height:1.5;padding:10px;border-radius:6px;white-space:pre-wrap;word-break:break-all;margin-top:20px;"></pre>
 
     <script>
         var APP_SCHEME = 'com.bshapiro.leadershiptracker';
         var FOLDER_MIME = 'application/vnd.google-apps.folder';
+
+        // On-device diagnostics: the system browser's console is unreachable on
+        // a phone, so echo the picker lifecycle to a visible panel. A blank
+        // Google Picker (valid params, no error thrown) is almost always an
+        // environment problem inside the picker iframe — this shows how far the
+        // flow gets and surfaces async errors the try/catch can't catch.
+        function dbg(msg) {
+            var el = document.getElementById('debug');
+            el.style.display = 'block';
+            el.textContent += msg + '\n';
+        }
+        window.addEventListener('error', function(e) {
+            dbg('⚠ JS error: ' + (e.message || e) + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : ''));
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            var r = e.reason;
+            dbg('⚠ promise rejection: ' + (r && r.message ? r.message : JSON.stringify(r)));
+        });
 
         function getHashParams() {
             var hash = window.location.hash.substring(1);
@@ -119,6 +138,12 @@
         var mode = hashParams.mode === 'files' ? 'files' : 'folder';
         var parent = hashParams.parent || null;
 
+        dbg('mode=' + mode + ' parent=' + (parent || '(none)'));
+        dbg('origin=' + window.location.origin);
+        dbg('apiKey=' + (apiKey ? apiKey.slice(0, 8) + '…' : '(MISSING)') +
+            ' appId=' + (appId || '(MISSING)') +
+            ' token=' + (accessToken ? 'present(' + accessToken.length + ')' : '(MISSING)'));
+
         // Tailor the copy to the mode.
         if (mode === 'files') {
             document.getElementById('heading').textContent = 'Select Your Files';
@@ -141,7 +166,9 @@
             var script = document.createElement('script');
             script.src = 'https://apis.google.com/js/api.js';
             script.onload = function() {
+                dbg('api.js loaded; loading picker module…');
                 gapi.load('picker', function() {
+                    dbg('picker module loaded — ready');
                     var btn = document.getElementById('openPickerBtn');
                     btn.disabled = false;
                     btn.textContent = mode === 'files' ? 'Open File Picker' : 'Open Folder Picker';
@@ -159,10 +186,12 @@
             // appeared dead. Surface it on the page so a failure is debuggable
             // on-device instead of a silent no-op.
             try {
+                dbg('openPicker: building…');
                 var builder = new google.picker.PickerBuilder()
                     .setAppId(appId)
                     .setOAuthToken(accessToken)
                     .setDeveloperKey(apiKey)
+                    .setOrigin(window.location.protocol + '//' + window.location.host)
                     .setCallback(pickerCallback);
 
                 if (mode === 'files') {
@@ -185,13 +214,18 @@
                         .setTitle('Select your shared folder');
                 }
 
+                dbg('openPicker: setVisible(true)');
                 builder.build().setVisible(true);
+                dbg('openPicker: picker shown (waiting for selection)');
             } catch (e) {
+                dbg('⚠ openPicker threw: ' + (e && e.message ? e.message : e));
                 showError('Could not open the picker: ' + (e && e.message ? e.message : e));
             }
         }
 
         function pickerCallback(data) {
+            dbg('callback action=' + data.action +
+                (data.docs ? ' docs=' + data.docs.length : ''));
             if (data.action !== google.picker.Action.PICKED) return;
 
             if (mode === 'files') {
