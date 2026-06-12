@@ -155,33 +155,40 @@
         }
 
         function openPicker() {
-            var builder = new google.picker.PickerBuilder()
-                .setAppId(appId)
-                .setOAuthToken(accessToken)
-                .setDeveloperKey(apiKey)
-                .setCallback(pickerCallback);
+            // A thrown error here previously did NOTHING visible — the button
+            // appeared dead. Surface it on the page so a failure is debuggable
+            // on-device instead of a silent no-op.
+            try {
+                var builder = new google.picker.PickerBuilder()
+                    .setAppId(appId)
+                    .setOAuthToken(accessToken)
+                    .setDeveloperKey(apiKey)
+                    .setCallback(pickerCallback);
 
-            if (mode === 'files') {
-                // Pre-navigate INTO the shared folder, show only the app's JSON
-                // files, and allow selecting all of them at once.
-                var filesView = new google.picker.DocsView(google.picker.ViewId.DOCS)
-                    .setParent(parent)
-                    .setMimeTypes('application/json')
-                    .setIncludeFolders(false)
-                    .setSelectFolderEnabled(false);
-                builder.addView(filesView)
-                    .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-                    .setTitle('Select all the Leadership Tracker files');
-            } else {
-                // Same folder view as the (known-working) original picker.
-                var folderView = new google.picker.DocsView()
-                    .setIncludeFolders(true)
-                    .setSelectFolderEnabled(true);
-                builder.addView(folderView)
-                    .setTitle('Select your shared folder');
+                if (mode === 'files') {
+                    // Pre-navigate INTO the shared folder, show only the app's
+                    // JSON files, and allow selecting all of them at once.
+                    var filesView = new google.picker.DocsView(google.picker.ViewId.DOCS)
+                        .setParent(parent)
+                        .setMimeTypes('application/json')
+                        .setIncludeFolders(false)
+                        .setSelectFolderEnabled(false);
+                    builder.addView(filesView)
+                        .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+                        .setTitle('Select all the Leadership Tracker files');
+                } else {
+                    // Same folder view as the (known-working) original picker.
+                    var folderView = new google.picker.DocsView()
+                        .setIncludeFolders(true)
+                        .setSelectFolderEnabled(true);
+                    builder.addView(folderView)
+                        .setTitle('Select your shared folder');
+                }
+
+                builder.build().setVisible(true);
+            } catch (e) {
+                showError('Could not open the picker: ' + (e && e.message ? e.message : e));
             }
-
-            builder.build().setVisible(true);
         }
 
         function pickerCallback(data) {
