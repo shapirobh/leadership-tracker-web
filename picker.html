@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leadership Tracker — Select a Folder</title>
+    <title>Leadership Tracker — Picker</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -13,7 +13,6 @@
             color: #333;
         }
         h2 { text-align: center; margin-bottom: 16px; }
-        h3 { margin: 18px 0 6px; font-size: 15px; }
         .intro { text-align: center; color: #555; margin-bottom: 24px; line-height: 1.5; }
         .steps {
             background: #f8f9fa;
@@ -27,15 +26,6 @@
         .warning {
             background: #fff8e1;
             border-left: 4px solid #f5b400;
-            border-radius: 4px;
-            padding: 12px 16px;
-            margin-bottom: 24px;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-        .diag {
-            background: #e8f0fe;
-            border-left: 4px solid #1a73e8;
             border-radius: 4px;
             padding: 12px 16px;
             margin-bottom: 24px;
@@ -57,56 +47,35 @@
         .btn:disabled { background: #ccc; cursor: default; }
         #status { text-align: center; margin: 16px 0; color: #666; display: none; }
         #error { color: #EA4335; text-align: center; margin: 16px 0; display: none; }
-        #results { display: none; margin-top: 24px; border-top: 1px solid #ddd; padding-top: 8px; }
-        #results div { margin: 4px 0; word-break: break-all; }
-        #results pre {
-            background: #f1f3f4;
-            border-radius: 6px;
-            padding: 10px;
-            font-size: 12px;
-            white-space: pre-wrap;
-            word-break: break-all;
-            overflow-x: auto;
-        }
-        .verdict { text-align: center; font-size: 20px; margin: 16px 0; }
     </style>
 </head>
 <body>
-    <h2>Select Your Folder</h2>
-    <p class="intro">Choose the Google Drive folder where Leadership Tracker will store
-    your callings, interviews, and meeting data.</p>
+    <h2 id="heading">Leadership Tracker</h2>
+    <p class="intro" id="intro"></p>
 
-    <div class="steps">
+    <div class="steps" id="folderSteps" style="display:none;">
         <p><strong>If you haven't created a folder yet:</strong></p>
-        <p>1. Open <a href="https://drive.google.com" target="_blank">Google Drive</a> in a
-        new tab.</p>
+        <p>1. Open <a href="https://drive.google.com" target="_blank">Google Drive</a> in a new tab.</p>
         <p>2. Create a new, empty folder (e.g., "Ward Leadership" or "Stake Presidency").</p>
-        <p>3. Right-click the folder, select "Share," and add each member of your bishopric
-        or presidency as an Editor.</p>
-        <p>4. Come back to this page and tap the button below to select that folder.</p>
+        <p>3. Right-click the folder, select "Share," and add each member of your bishopric or presidency as an <strong>Editor</strong>.</p>
+        <p>4. Come back here and tap the button below to select that folder.</p>
     </div>
 
-    <div class="warning">
-        <strong>Important:</strong> Only share the folder with named accounts of your
-        leadership team members. Never set it to "Anyone with the link."
+    <div class="warning" id="folderWarning" style="display:none;">
+        <strong>Important:</strong> Only share the folder with named accounts of your leadership team. Never set it to "Anyone with the link."
     </div>
 
-    <div class="diag">
-        <strong>Access diagnostic (temporary):</strong> to test shared access, you can open
-        the folder in the picker and select a <em>file</em> that another user created
-        (e.g. <code>config.json</code>). This page will then try to read that file and report
-        whether your account is allowed to. Selecting a <em>folder</em> works normally.
+    <div class="steps" id="filesSteps" style="display:none;">
+        <p><strong>Select every Leadership Tracker file in this folder.</strong></p>
+        <p>Tap the button, then select <strong>all of them</strong> — the picker is already inside your folder and shows only the app's files. They are:</p>
+        <p style="font-family:monospace;font-size:13px;color:#1a73e8;">config.json, members.json,<br>callings.json, callings-archive.json,<br>interviews.json, interviews-archive.json,<br>programs.json, programs-archive.json</p>
     </div>
 
     <div class="btn-container">
-        <button id="openPickerBtn" class="btn" disabled>Loading...</button>
+        <button id="openPickerBtn" class="btn" disabled>Loading…</button>
     </div>
     <p id="status"></p>
     <p id="error"></p>
-    <div id="results"></div>
-    <div class="btn-container">
-        <button id="doneBtn" class="btn" style="display:none;background:#5f6368;">Done — return to app</button>
-    </div>
 
     <script>
         var APP_SCHEME = 'com.bshapiro.leadershiptracker';
@@ -141,23 +110,33 @@
             window.location.href = APP_SCHEME + '://folder?' + query;
         }
 
-        function esc(s) {
-            var d = document.createElement('div');
-            d.textContent = (s === null || s === undefined) ? '' : String(s);
-            return d.innerHTML;
-        }
-
-        function line(label, val) {
-            return '<div><strong>' + esc(label) + ':</strong> ' + esc(val) + '</div>';
-        }
-
         var hashParams = getHashParams();
         var accessToken = hashParams.token;
         var apiKey = hashParams.apiKey;
         var appId = hashParams.appId;
+        // mode: 'folder' (default — pick the shared folder) or 'files' (multi-select
+        // the fixed file set inside `parent`). The app drives which mode it needs.
+        var mode = hashParams.mode === 'files' ? 'files' : 'folder';
+        var parent = hashParams.parent || null;
+
+        // Tailor the copy to the mode.
+        if (mode === 'files') {
+            document.getElementById('heading').textContent = 'Select Your Files';
+            document.getElementById('intro').textContent =
+                'Adopt the Leadership Tracker files the organizer set up in your shared folder.';
+            document.getElementById('filesSteps').style.display = 'block';
+        } else {
+            document.getElementById('heading').textContent = 'Select Your Folder';
+            document.getElementById('intro').textContent =
+                'Choose the Google Drive folder where Leadership Tracker stores your unit data.';
+            document.getElementById('folderSteps').style.display = 'block';
+            document.getElementById('folderWarning').style.display = 'block';
+        }
 
         if (!accessToken || !apiKey || !appId) {
             showError('Missing required parameters. Please open this page from within the Leadership Tracker app.');
+        } else if (mode === 'files' && !parent) {
+            showError('Missing the folder to open. Please start from the Leadership Tracker app.');
         } else {
             var script = document.createElement('script');
             script.src = 'https://apis.google.com/js/api.js';
@@ -165,7 +144,7 @@
                 gapi.load('picker', function() {
                     var btn = document.getElementById('openPickerBtn');
                     btn.disabled = false;
-                    btn.textContent = 'Open Folder Picker';
+                    btn.textContent = mode === 'files' ? 'Open File Picker' : 'Open Folder Picker';
                     btn.onclick = openPicker;
                 });
             };
@@ -176,190 +155,52 @@
         }
 
         function openPicker() {
-            // No MIME filter + folders navigable, so both folders AND files are shown.
-            // Folders remain selectable (normal flow); files trigger the access diagnostic.
-            var picker = new google.picker.PickerBuilder()
+            var builder = new google.picker.PickerBuilder()
                 .setAppId(appId)
                 .setOAuthToken(accessToken)
                 .setDeveloperKey(apiKey)
-                .addView(new google.picker.DocsView()
-                    .setIncludeFolders(true)
-                    .setSelectFolderEnabled(true))
-                .setCallback(pickerCallback)
-                .setTitle('Select a folder — or a file to test access')
-                .build();
+                .setCallback(pickerCallback);
 
-            picker.setVisible(true);
+            if (mode === 'files') {
+                // Pre-navigate INTO the shared folder, show only the app's JSON
+                // files, and allow selecting all of them at once.
+                var filesView = new google.picker.DocsView(google.picker.ViewId.DOCS)
+                    .setParent(parent)
+                    .setMimeTypes('application/json')
+                    .setIncludeFolders(false)
+                    .setSelectFolderEnabled(false);
+                builder.addView(filesView)
+                    .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+                    .setTitle('Select all the Leadership Tracker files');
+            } else {
+                // Same folder view as the (known-working) original picker.
+                var folderView = new google.picker.DocsView()
+                    .setIncludeFolders(true)
+                    .setSelectFolderEnabled(true);
+                builder.addView(folderView)
+                    .setTitle('Select your shared folder');
+            }
+
+            builder.build().setVisible(true);
         }
 
         function pickerCallback(data) {
-            if (data.action === google.picker.Action.PICKED) {
-                var doc = data.docs[0];
-                if (doc.mimeType === FOLDER_MIME) {
-                    // Normal folder-link flow — unchanged behavior.
-                    redirectToApp({ id: doc.id, name: doc.name });
-                } else {
-                    // A file was picked — run the cross-user read diagnostic.
-                    runAccessTest(doc.id, doc.name, doc.mimeType);
-                }
-            } else if (data.action === google.picker.Action.CANCEL) {
-                // Let the user retry; do nothing.
-            }
-        }
+            if (data.action !== google.picker.Action.PICKED) return;
 
-        function runAccessTest(fileId, fileName, mimeType) {
-            var out = document.getElementById('results');
-            out.style.display = 'block';
-            out.innerHTML = '<h3>Picked file</h3>'
-                + line('Name', fileName)
-                + line('File ID', fileId)
-                + line('MIME type', mimeType)
-                + '<h3>Reading metadata…</h3>';
-            document.getElementById('doneBtn').style.display = 'inline-block';
-
-            var metaUrl = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId)
-                + '?supportsAllDrives=true&fields=id,name,ownedByMe,mimeType,owners(displayName,emailAddress),capabilities(canEdit,canModifyContent)';
-
-            fetch(metaUrl, { headers: { Authorization: 'Bearer ' + accessToken } })
-                .then(function(res) {
-                    return res.text().then(function(body) {
-                        return { status: res.status, ok: res.ok, body: body };
-                    });
-                })
-                .then(function(meta) {
-                    var html = '<h3>Metadata read</h3>';
-                    html += line('HTTP status', meta.status + (meta.ok ? '  (OK)' : '  (DENIED)'));
-                    if (meta.ok) {
-                        try {
-                            var j = JSON.parse(meta.body);
-                            if (j.owners && j.owners[0]) {
-                                html += line('Owner', (j.owners[0].displayName || '') + ' <' + (j.owners[0].emailAddress || '') + '>');
-                            }
-                            html += line('ownedByMe', j.ownedByMe);
-                            if (j.capabilities) {
-                                html += line('capabilities.canEdit', j.capabilities.canEdit);
-                                html += line('capabilities.canModifyContent', j.capabilities.canModifyContent);
-                            }
-                        } catch (e) {}
-                    } else {
-                        html += '<pre>' + esc(meta.body) + '</pre>';
-                    }
-                    out.innerHTML += html;
-
-                    if (!meta.ok) {
-                        finalVerdict(false, false);
-                        return;
-                    }
-
-                    var isGoogleNative = mimeType && mimeType.indexOf('application/vnd.google-apps') === 0;
-                    if (isGoogleNative) {
-                        out.innerHTML += '<h3>Content read</h3>'
-                            + line('Skipped', 'Google-native type has no direct downloadable content');
-                        runWriteTest(fileId, true);
-                        return;
-                    }
-
-                    out.innerHTML += '<h3>Reading file content…</h3>';
-                    var mediaUrl = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId)
-                        + '?alt=media&supportsAllDrives=true';
-                    fetch(mediaUrl, { headers: { Authorization: 'Bearer ' + accessToken } })
-                        .then(function(res) {
-                            return res.text().then(function(body) {
-                                return { status: res.status, ok: res.ok, body: body };
-                            });
-                        })
-                        .then(function(c) {
-                            var h = '<h3>Content read (alt=media)</h3>';
-                            h += line('HTTP status', c.status + (c.ok ? '  (OK — CAN READ)' : '  (DENIED)'));
-                            h += '<pre>' + esc(c.body.slice(0, 500)) + '</pre>';
-                            out.innerHTML += h;
-                            runWriteTest(fileId, c.ok);
-                        })
-                        .catch(function(e) {
-                            out.innerHTML += '<pre>content fetch error: ' + esc(e) + '</pre>';
-                            runWriteTest(fileId, false);
-                        });
-                })
-                .catch(function(e) {
-                    out.innerHTML += '<pre>metadata fetch error: ' + esc(e) + '</pre>';
-                    finalVerdict(false, false);
+            if (mode === 'files') {
+                var files = (data.docs || []).map(function(d) {
+                    return { id: d.id, name: d.name };
                 });
-        }
-
-        // Non-destructive write test: set a temporary custom property, then remove it.
-        // Exercises the same edit permission a content update needs, without touching
-        // the file's actual contents.
-        function runWriteTest(fileId, readOk) {
-            var out = document.getElementById('results');
-            out.innerHTML += '<h3>Write test (non-destructive)…</h3>';
-
-            var url = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId)
-                + '?supportsAllDrives=true&fields=id,properties';
-
-            fetch(url, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': 'Bearer ' + accessToken,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ properties: { ltWriteTest: 'ok' } })
-            })
-                .then(function(res) {
-                    return res.text().then(function(body) {
-                        return { status: res.status, ok: res.ok, body: body };
-                    });
-                })
-                .then(function(w) {
-                    var h = '<h3>Write result (set property)</h3>';
-                    h += line('HTTP status', w.status + (w.ok ? '  (OK — CAN WRITE)' : '  (DENIED)'));
-                    if (!w.ok) h += '<pre>' + esc(w.body) + '</pre>';
-                    out.innerHTML += h;
-                    if (w.ok) { cleanupWriteTest(fileId); }
-                    finalVerdict(readOk, w.ok);
-                })
-                .catch(function(e) {
-                    out.innerHTML += '<pre>write fetch error: ' + esc(e) + '</pre>';
-                    finalVerdict(readOk, false);
-                });
-        }
-
-        // Remove the temporary test property so the file is left exactly as it was.
-        function cleanupWriteTest(fileId) {
-            var url = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId)
-                + '?supportsAllDrives=true&fields=id';
-            fetch(url, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': 'Bearer ' + accessToken,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ properties: { ltWriteTest: null } })
-            }).catch(function() {});
-        }
-
-        function finalVerdict(readOk, writeOk) {
-            var out = document.getElementById('results');
-            var bothOk = readOk && writeOk;
-            var color = bothOk ? '#188038' : ((writeOk || readOk) ? '#f5b400' : '#EA4335');
-            var label;
-            if (bothOk) {
-                label = '✓ READ + WRITE — collaboration viable';
-            } else if (readOk && !writeOk) {
-                label = '◑ READ ONLY — cannot update this file';
-            } else if (!readOk && writeOk) {
-                label = '◑ WRITE ONLY — could not read content';
+                redirectToApp({ files: JSON.stringify(files) });
             } else {
-                label = '✗ NO ACCESS';
+                var doc = data.docs[0];
+                // Only a folder is a valid folder-mode result; ignore a stray
+                // file selection so it can't be returned as a folder id.
+                if (doc && doc.mimeType === FOLDER_MIME) {
+                    redirectToApp({ id: doc.id, name: doc.name });
+                }
             }
-            out.innerHTML += '<div class="verdict" style="color:' + color + ';"><strong>' + esc(label) + '</strong></div>'
-                + line('Read', readOk ? 'granted' : 'denied')
-                + line('Write', writeOk ? 'granted' : 'denied')
-                + '<p style="text-align:center;color:#666;font-size:13px;">Screenshot this whole page and send it back.</p>';
         }
-
-        document.getElementById('doneBtn').onclick = function() {
-            redirectToApp({ cancelled: '1' });
-        };
     </script>
 </body>
 </html>
