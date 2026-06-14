@@ -6,60 +6,47 @@
     <title>Leadership Tracker — Picker</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; max-width: 680px; margin: 0 auto; color: #222; }
-        h2 { margin-bottom: 8px; }
+        h2 { margin-bottom: 4px; }
         .intro { color: #555; margin-bottom: 16px; line-height: 1.5; }
-        .steps { background: #f8f9fa; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; line-height: 1.5; font-size: 14px; }
-        .steps p { margin: 8px 0; }
-        .warning { background: #fff8e1; border-left: 4px solid #f5b400; border-radius: 4px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; line-height: 1.4; }
         .btn { background: #1a73e8; color: #fff; border: none; padding: 14px 28px; border-radius: 8px; font-size: 16px; cursor: pointer; min-width: 240px; }
         .btn:disabled { background: #bbb; cursor: default; }
-        #status { margin: 16px 0; color: #666; display: none; }
         #error { color: #EA4335; margin: 16px 0; display: none; }
+        #debug { background: #1e1e1e; color: #9cdcfe; font-size: 12px; line-height: 1.6; padding: 12px; border-radius: 6px; white-space: pre-wrap; word-break: break-all; margin-top: 20px; min-height: 40px; }
     </style>
 </head>
 <body>
     <h2 id="heading">Leadership Tracker</h2>
     <p class="intro" id="intro"></p>
-
-    <div class="steps" id="filesSteps" style="display:none;">
-        <p><strong>Select all eight Leadership Tracker files</strong> in this folder:</p>
-        <p style="font-family:monospace;font-size:12px;color:#1a73e8;">config.json, members.json, callings.json, callings-archive.json, interviews.json, interviews-archive.json, programs.json, programs-archive.json</p>
-    </div>
-
-    <div class="warning" id="folderWarning" style="display:none;">
-        Only share the folder with named accounts of your leadership team — never "Anyone with the link."
-    </div>
-
     <button id="openPickerBtn" class="btn" disabled>Loading…</button>
-    <p id="status"></p>
     <p id="error"></p>
+    <pre id="debug"></pre>
 
     <script>
         var APP_SCHEME = 'com.bshapiro.leadershiptracker';
         var FOLDER_MIME = 'application/vnd.google-apps.folder';
-        // 🔒 Scope is LOCKED to drive.file (matches the app — never widen it).
+        // 🔒 Scope LOCKED to drive.file. Key/appId hardcoded (public,
+        // referrer-restricted) — same values the working test page uses.
         var DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+        var API_KEY = 'AIzaSyCk-uLXVKMSJaEoW68CDebB8GWi86Am-t8';
+        var APP_ID = '537892786449';
+
+        function dbg(m) { var el = document.getElementById('debug'); el.textContent += m + '\n'; console.log('[picker]', m); }
 
         function getHashParams() {
             var hash = window.location.hash.substring(1);
             var params = {};
             hash.split('&').forEach(function(pair) {
                 var idx = pair.indexOf('=');
-                if (idx > 0) {
-                    params[decodeURIComponent(pair.slice(0, idx))] = decodeURIComponent(pair.slice(idx + 1));
-                }
+                if (idx > 0) { params[decodeURIComponent(pair.slice(0, idx))] = decodeURIComponent(pair.slice(idx + 1)); }
             });
             return params;
         }
 
         function showError(msg) {
-            document.getElementById('status').style.display = 'none';
             var el = document.getElementById('error');
-            el.textContent = msg;
-            el.style.display = 'block';
+            el.textContent = msg; el.style.display = 'block';
             var btn = document.getElementById('openPickerBtn');
-            btn.disabled = true;
-            btn.textContent = 'Error';
+            btn.disabled = true; btn.textContent = 'Error';
         }
 
         function redirectToApp(params) {
@@ -70,32 +57,18 @@
         }
 
         var hashParams = getHashParams();
-        var accessToken = hashParams.token || null;
-        var apiKey = hashParams.apiKey;
-        var appId = hashParams.appId;
         var clientId = hashParams.clientId || null;
+        var accessToken = hashParams.token || null;
         var mode = hashParams.mode === 'files' ? 'files' : 'folder';
         var parent = hashParams.parent || null;
         var useGis = !!clientId;
 
-        // Strip the hash from the address bar NOW that the params are parsed.
-        // gapi's iframe RPC (gapi_iframes) derives its relay/origin target from
-        // window.location; a leftover hash corrupts that target and makes
-        // setVisible crash with "Cannot read properties of null (reading
-        // 'postMessage')" — the working test page has no hash, which was the
-        // real difference all along. Keep pathname + search only.
-        try {
-            history.replaceState(null, '', window.location.pathname + window.location.search);
-        } catch (e) { /* non-fatal */ }
-
         document.getElementById('heading').textContent = mode === 'files' ? 'Select Your Files' : 'Select Your Folder';
-        if (mode === 'files') {
-            document.getElementById('intro').textContent = 'Adopt the Leadership Tracker files in your shared folder.';
-            document.getElementById('filesSteps').style.display = 'block';
-        } else {
-            document.getElementById('intro').textContent = 'Choose the Google Drive folder where your unit data is stored.';
-            document.getElementById('folderWarning').style.display = 'block';
-        }
+        document.getElementById('intro').textContent = mode === 'files'
+            ? 'Select all the Leadership Tracker files in your shared folder.'
+            : 'Choose the Google Drive folder where your unit data is stored.';
+
+        dbg('origin=' + window.location.origin + ' mode=' + mode + ' useGis=' + useGis);
 
         var pickerReady = false, gisReady = false, tokenClient = null;
         function maybeEnable() {
@@ -107,17 +80,16 @@
             b.onclick = onGo;
         }
 
-        // Load gapi (picker) + GIS at top level, exactly like the working page.
         var s1 = document.createElement('script');
         s1.src = 'https://apis.google.com/js/api.js';
-        s1.onload = function() { gapi.load('picker', function() { pickerReady = true; maybeEnable(); }); };
+        s1.onload = function() { dbg('api.js loaded'); gapi.load('picker', function() { dbg('picker module loaded'); pickerReady = true; maybeEnable(); }); };
         s1.onerror = function() { showError('Failed to load Google APIs. Check your connection and try again.'); };
         document.body.appendChild(s1);
 
         if (useGis) {
             var s2 = document.createElement('script');
             s2.src = 'https://accounts.google.com/gsi/client';
-            s2.onload = function() { gisReady = true; maybeEnable(); };
+            s2.onload = function() { dbg('GIS loaded'); gisReady = true; maybeEnable(); };
             s2.onerror = function() { showError('Failed to load Google sign-in. Check your connection and try again.'); };
             document.body.appendChild(s2);
         } else {
@@ -126,7 +98,6 @@
 
         function onGo() {
             if (!useGis) { openPicker(); return; }
-            // Create the token client FRESH on click (exactly like the working page).
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: clientId,
                 scope: DRIVE_SCOPE,
@@ -134,12 +105,8 @@
                     if (resp && resp.error) { showError('Google sign-in failed: ' + resp.error); return; }
                     if (!resp || !resp.access_token) { showError('Google did not return an access token. Reload and try again.'); return; }
                     accessToken = resp.access_token;
-                    // Defer OUT of GIS's token-callback stack: opening the picker
-                    // synchronously here makes gapi's iframe RPC postMessage while
-                    // GIS's own popup handler is still on the stack, which nulls
-                    // the target window ("Cannot read properties of null (reading
-                    // 'postMessage')"). Let GIS unwind first.
-                    setTimeout(openPicker, 0);
+                    dbg('token acquired (' + accessToken.length + ' chars)');
+                    openPicker();
                 },
                 error_callback: function() { showError('Google sign-in was cancelled or failed. Reload the page to try again.'); },
             });
@@ -148,45 +115,41 @@
 
         function openPicker() {
             try {
+                dbg('building picker…');
                 var view;
                 if (mode === 'files') {
                     view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-                        .setParent(parent)
-                        .setMimeTypes('application/json')
-                        .setIncludeFolders(false)
-                        .setSelectFolderEnabled(false);
+                        .setParent(parent).setMimeTypes('application/json')
+                        .setIncludeFolders(false).setSelectFolderEnabled(false);
                 } else {
-                    view = new google.picker.DocsView()
-                        .setIncludeFolders(true)
-                        .setSelectFolderEnabled(true);
+                    view = new google.picker.DocsView().setIncludeFolders(true).setSelectFolderEnabled(true);
                 }
                 var builder = new google.picker.PickerBuilder()
-                    .setAppId(appId)
+                    .setAppId(APP_ID)
                     .setOAuthToken(accessToken)
-                    .setDeveloperKey(apiKey)
+                    .setDeveloperKey(API_KEY)
                     .setOrigin(window.location.protocol + '//' + window.location.host)
                     .addView(view)
                     .setCallback(pickerCallback);
-                if (mode === 'files') {
-                    builder.enableFeature(google.picker.Feature.MULTISELECT_ENABLED);
-                }
-                var picker = builder.build();
-                picker.setVisible(true);
+                if (mode === 'files') { builder.enableFeature(google.picker.Feature.MULTISELECT_ENABLED); }
+                dbg('setVisible(true)');
+                builder.build().setVisible(true);
+                dbg('picker shown');
             } catch (e) {
+                dbg('openPicker threw: ' + (e && e.message ? e.message : e));
                 showError('Could not open the picker: ' + (e && e.message ? e.message : e));
             }
         }
 
         function pickerCallback(data) {
+            dbg('callback action=' + data.action);
             if (data.action !== google.picker.Action.PICKED) return;
             if (mode === 'files') {
                 var files = (data.docs || []).map(function(d) { return { id: d.id, name: d.name }; });
                 redirectToApp({ files: JSON.stringify(files) });
             } else {
                 var doc = data.docs[0];
-                if (doc && doc.mimeType === FOLDER_MIME) {
-                    redirectToApp({ id: doc.id, name: doc.name });
-                }
+                if (doc && doc.mimeType === FOLDER_MIME) { redirectToApp({ id: doc.id, name: doc.name }); }
             }
         }
     </script>
