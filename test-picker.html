@@ -28,6 +28,9 @@
 
     <button id="go" class="btn" disabled>Loading Google APIs…</button>
 
+    <p style="margin-top:24px;color:#666;font-size:14px;">Isolation test — open the app's real <code>picker.html</code> in THIS full Chrome tab (enter the Client ID above first):</p>
+    <button id="goAppPage" class="btn" style="background:#555;">Open app's picker.html here</button>
+
     <pre id="debug"></pre>
 
     <script>
@@ -42,6 +45,18 @@
             el.textContent += m + '\n';
             console.log('[picker-test]', m);
         }
+
+        // Isolation: load the REAL picker.html in this same full Chrome tab,
+        // with the GIS clientId so it runs the same path the app uses. If the
+        // picker renders here but blank in the app's custom tab, the Custom Tab
+        // is the culprit (not picker.html).
+        document.getElementById('goAppPage').onclick = function() {
+            var clientId = document.getElementById('clientId').value.trim();
+            if (!clientId) { dbg('⚠ enter the Web OAuth Client ID first'); return; }
+            window.location.href = 'picker.html#apiKey=' + encodeURIComponent(API_KEY) +
+                '&appId=' + encodeURIComponent(APP_ID) +
+                '&clientId=' + encodeURIComponent(clientId) + '&mode=folder';
+        };
         window.addEventListener('error', function(e) {
             dbg('⚠ window error: ' + (e.message || e) + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : ''));
         });
