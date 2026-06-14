@@ -143,6 +143,12 @@
                     view = new google.picker.DocsView(google.picker.ViewId.DOCS)
                         .setMimeTypes('application/json')
                         .setIncludeFolders(false).setSelectFolderEnabled(false);
+                    // Grid mode renders a tap-to-select check overlay on each
+                    // tile — the only touch multi-select affordance the Picker
+                    // offers (desktop list mode needs Ctrl/Shift, absent on phones).
+                    if (google.picker.DocsViewMode && google.picker.DocsViewMode.GRID) {
+                        view.setMode(google.picker.DocsViewMode.GRID);
+                    }
                     if (parentFolderId) { view.setParent(parentFolderId); }
                 } else {
                     view = new google.picker.DocsView().setIncludeFolders(true).setSelectFolderEnabled(true);
