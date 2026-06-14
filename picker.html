@@ -81,12 +81,12 @@
     <script>
         var APP_SCHEME = 'com.bshapiro.leadershiptracker';
         var FOLDER_MIME = 'application/vnd.google-apps.folder';
+        // 🔒 Scope is LOCKED to drive.file (matches the app — never widen it).
+        var DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 
         // On-device diagnostics: the system browser's console is unreachable on
-        // a phone, so echo the picker lifecycle to a visible panel. A blank
-        // Google Picker (valid params, no error thrown) is almost always an
-        // environment problem inside the picker iframe — this shows how far the
-        // flow gets and surfaces async errors the try/catch can't catch.
+        // a phone, so echo the picker lifecycle to a visible panel AND carry it
+        // back to the app's log buffer if the picker stalls (see returnDiagnostics).
         var debugLog = [];
         function dbg(msg) {
             debugLog.push(msg);
@@ -106,9 +106,9 @@
             var hash = window.location.hash.substring(1);
             var params = {};
             hash.split('&').forEach(function(pair) {
-                var parts = pair.split('=');
-                if (parts.length === 2) {
-                    params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1]);
+                var idx = pair.indexOf('=');
+                if (idx > 0) {
+                    params[decodeURIComponent(pair.slice(0, idx))] = decodeURIComponent(pair.slice(idx + 1));
                 }
             });
             return params;
@@ -140,17 +140,17 @@
         // (this debug panel included) and never fires a callback, trapping the
         // user. If no picker callback arrives shortly after we show it, return
         // to the app carrying the diagnostic trail so it lands in the in-app log
-        // buffer (Settings → Share Logs) instead of being stuck behind the
-        // blank overlay. A picker that DOES come alive fires a callback, which
-        // cancels this — so a working picker is never interrupted.
+        // buffer (Settings → Share Logs). A picker that DOES come alive fires a
+        // callback, which cancels this — so a working picker is never interrupted.
         function returnDiagnostics() {
             redirectToApp({ cancelled: '1', diag: debugLog.join(' | ') });
         }
 
         var hashParams = getHashParams();
-        var accessToken = hashParams.token;
+        var accessToken = hashParams.token || null;   // legacy fallback token (app-minted)
         var apiKey = hashParams.apiKey;
         var appId = hashParams.appId;
+        var clientId = hashParams.clientId || null;    // Web OAuth client id (GIS flow)
         // mode: 'folder' (default — pick the shared folder) or 'files' (multi-select
         // the fixed file set inside `parent`). The app drives which mode it needs.
         var mode = hashParams.mode === 'files' ? 'files' : 'folder';
@@ -160,7 +160,8 @@
         dbg('origin=' + window.location.origin);
         dbg('apiKey=' + (apiKey ? apiKey.slice(0, 8) + '…' : '(MISSING)') +
             ' appId=' + (appId || '(MISSING)') +
-            ' token=' + (accessToken ? 'present(' + accessToken.length + ')' : '(MISSING)'));
+            ' clientId=' + (clientId ? clientId.slice(0, 12) + '…' : '(none)') +
+            ' token=' + (accessToken ? 'present(' + accessToken.length + ')' : '(none)'));
 
         // Tailor the copy to the mode.
         if (mode === 'files') {
@@ -176,35 +177,131 @@
             document.getElementById('folderWarning').style.display = 'block';
         }
 
-        if (!accessToken || !apiKey || !appId) {
+        // Token strategy:
+        //  - PREFERRED (clientId present): acquire the access token IN THE
+        //    BROWSER via Google Identity Services. This establishes the Google
+        //    session the Picker iframe needs (a native-app-minted token with no
+        //    in-browser session makes the Picker render blank with a cross-origin
+        //    "Script error") AND yields a token the Picker accepts.
+        //  - FALLBACK (no clientId): use the app-passed token directly (the old
+        //    behaviour), so an older app build still works.
+        var useGis = !!clientId;
+
+        // Load the Picker module (needed in both strategies).
+        var pickerReady = false;
+        var authReady = false;
+        var tokenClient = null;
+
+        function bothReady() { return pickerReady && authReady; }
+        function enableButton() {
+            if (!bothReady()) return;
+            var btn = document.getElementById('openPickerBtn');
+            btn.disabled = false;
+            btn.textContent = mode === 'files' ? 'Open File Picker' : 'Open Folder Picker';
+            btn.onclick = onPickClicked;
+        }
+
+        if (!apiKey || !appId) {
             showError('Missing required parameters. Please open this page from within the Leadership Tracker app.');
         } else if (mode === 'files' && !parent) {
             showError('Missing the folder to open. Please start from the Leadership Tracker app.');
+        } else if (!useGis && !accessToken) {
+            showError('Missing sign-in details. Please update the app and try again.');
         } else {
-            var script = document.createElement('script');
-            script.src = 'https://apis.google.com/js/api.js';
-            script.onload = function() {
+            // 1) Picker module via gapi.
+            var gapiScript = document.createElement('script');
+            gapiScript.src = 'https://apis.google.com/js/api.js';
+            gapiScript.onload = function() {
                 dbg('api.js loaded; loading picker module…');
                 gapi.load('picker', function() {
-                    dbg('picker module loaded — ready');
-                    var btn = document.getElementById('openPickerBtn');
-                    btn.disabled = false;
-                    btn.textContent = mode === 'files' ? 'Open File Picker' : 'Open Folder Picker';
-                    btn.onclick = openPicker;
+                    dbg('picker module loaded');
+                    pickerReady = true;
+                    enableButton();
                 });
             };
-            script.onerror = function() {
+            gapiScript.onerror = function() {
                 showError('Failed to load Google APIs. Check your internet connection and try again.');
             };
-            document.body.appendChild(script);
+            document.body.appendChild(gapiScript);
+
+            // 2) Auth: GIS token client, or skip straight to ready in the
+            //    fallback path.
+            if (useGis) {
+                var gisScript = document.createElement('script');
+                gisScript.src = 'https://accounts.google.com/gsi/client';
+                gisScript.onload = function() {
+                    dbg('GIS loaded; initialising token client');
+                    try {
+                        tokenClient = google.accounts.oauth2.initTokenClient({
+                            client_id: clientId,
+                            scope: DRIVE_SCOPE,
+                            callback: handleTokenResponse,
+                            error_callback: function(err) {
+                                dbg('GIS error_callback: ' + (err && err.type ? err.type : JSON.stringify(err)));
+                                showError('Google sign-in was cancelled or failed. Tap to try again.');
+                                var btn = document.getElementById('openPickerBtn');
+                                btn.disabled = false;
+                                btn.textContent = 'Try Again';
+                            },
+                        });
+                        authReady = true;
+                        enableButton();
+                    } catch (e) {
+                        dbg('⚠ initTokenClient threw: ' + (e && e.message ? e.message : e));
+                        showError('Could not initialise Google sign-in: ' + (e && e.message ? e.message : e));
+                    }
+                };
+                gisScript.onerror = function() {
+                    showError('Failed to load Google sign-in. Check your internet connection and try again.');
+                };
+                document.body.appendChild(gisScript);
+            } else {
+                authReady = true;
+                enableButton();
+            }
         }
 
-        function openPicker() {
-            // A thrown error here previously did NOTHING visible — the button
-            // appeared dead. Surface it on the page so a failure is debuggable
-            // on-device instead of a silent no-op.
+        // Button tapped: in the GIS path, request a fresh in-browser token (this
+        // may show the Google account chooser / consent); in the fallback path,
+        // go straight to the picker with the app-passed token.
+        function onPickClicked() {
+            var btn = document.getElementById('openPickerBtn');
+            btn.disabled = true;
+            if (useGis) {
+                dbg('requesting access token via GIS…');
+                try {
+                    // prompt '' = reuse an existing grant silently when possible,
+                    // otherwise Google shows the chooser/consent.
+                    tokenClient.requestAccessToken({ prompt: '' });
+                } catch (e) {
+                    dbg('⚠ requestAccessToken threw: ' + (e && e.message ? e.message : e));
+                    showError('Could not start Google sign-in: ' + (e && e.message ? e.message : e));
+                    btn.disabled = false;
+                }
+            } else {
+                buildAndShowPicker();
+            }
+        }
+
+        function handleTokenResponse(resp) {
+            if (resp && resp.error) {
+                dbg('GIS token error: ' + resp.error);
+                showError('Google sign-in failed: ' + resp.error);
+                return;
+            }
+            if (!resp || !resp.access_token) {
+                dbg('GIS returned no access_token');
+                showError('Google did not return an access token. Please try again.');
+                return;
+            }
+            accessToken = resp.access_token;
+            dbg('GIS token acquired (' + accessToken.length + ' chars)');
+            buildAndShowPicker();
+        }
+
+        function buildAndShowPicker() {
             try {
-                dbg('openPicker: building…');
+                dbg('building picker…');
                 var builder = new google.picker.PickerBuilder()
                     .setAppId(appId)
                     .setOAuthToken(accessToken)
@@ -224,7 +321,6 @@
                         .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
                         .setTitle('Select all the Leadership Tracker files');
                 } else {
-                    // Same folder view as the (known-working) original picker.
                     var folderView = new google.picker.DocsView()
                         .setIncludeFolders(true)
                         .setSelectFolderEnabled(true);
@@ -232,9 +328,9 @@
                         .setTitle('Select your shared folder');
                 }
 
-                dbg('openPicker: setVisible(true)');
+                dbg('setVisible(true)');
                 builder.build().setVisible(true);
-                dbg('openPicker: picker shown (waiting for selection)');
+                dbg('picker shown (waiting for selection)');
                 // If the picker never calls back (blank render), bail out after
                 // 8s with the diagnostics so the user isn't trapped.
                 watchdog = setTimeout(function() {
@@ -242,7 +338,7 @@
                     returnDiagnostics();
                 }, 8000);
             } catch (e) {
-                dbg('⚠ openPicker threw: ' + (e && e.message ? e.message : e));
+                dbg('⚠ buildAndShowPicker threw: ' + (e && e.message ? e.message : e));
                 showError('Could not open the picker: ' + (e && e.message ? e.message : e));
             }
         }
