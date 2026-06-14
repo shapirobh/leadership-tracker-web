@@ -66,7 +66,10 @@
 
         var hashParams = getHashParams();
         var mode = hashParams.mode === 'files' ? 'files' : 'folder';
-        var parent = hashParams.parent || null;
+        // ⚠️ Do NOT name this `parent` — a global `var parent` clobbers
+        // window.parent, which gapi's iframe RPC posts to, crashing the Picker
+        // with "Cannot read properties of null (reading 'postMessage')".
+        var parentFolderId = hashParams.parent || null;
         // ADDED: prefill the (still visible) input from the hash so the flow is
         // identical to typing it by hand.
         if (hashParams.clientId) { document.getElementById('clientId').value = hashParams.clientId; }
@@ -141,7 +144,7 @@
                 dbg('building picker…');
                 var view;
                 if (mode === 'files') {
-                    view = new google.picker.DocsView(google.picker.ViewId.DOCS).setParent(parent).setMimeTypes('application/json').setIncludeFolders(false).setSelectFolderEnabled(false);
+                    view = new google.picker.DocsView(google.picker.ViewId.DOCS).setParent(parentFolderId).setMimeTypes('application/json').setIncludeFolders(false).setSelectFolderEnabled(false);
                 } else {
                     view = new google.picker.DocsView().setIncludeFolders(true).setSelectFolderEnabled(true);
                 }
