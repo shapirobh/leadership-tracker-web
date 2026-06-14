@@ -141,8 +141,9 @@
                 var view;
                 if (mode === 'files') {
                     view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-                        .setParent(parentFolderId).setMimeTypes('application/json')
+                        .setMimeTypes('application/json')
                         .setIncludeFolders(false).setSelectFolderEnabled(false);
+                    if (parentFolderId) { view.setParent(parentFolderId); }
                 } else {
                     view = new google.picker.DocsView().setIncludeFolders(true).setSelectFolderEnabled(true);
                 }
