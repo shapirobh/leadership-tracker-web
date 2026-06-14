@@ -161,7 +161,7 @@
         function setupFilesMode() {
             document.getElementById('heading').textContent = 'Select Your Files';
             document.getElementById('intro').textContent =
-                'Tap “Select” beside a file, then tap that same file in your folder. A green check appears here once it’s linked.';
+                'Tap “Select”, choose a file from your folder, and it links automatically — pick them in any order. A green check appears here as each one is linked.';
             document.getElementById('progress').style.display = 'block';
             renderList();
             updateProgress();
@@ -192,7 +192,7 @@
                 var btn = document.createElement('button');
                 btn.className = 'selectBtn'; btn.textContent = 'Select';
                 btn.disabled = !ready();
-                btn.onclick = function() { ensureToken(function() { openFilePicker(name); }); };
+                btn.onclick = function() { ensureToken(openFilePicker); };
                 div.appendChild(btn);
             }
             return div;
@@ -213,15 +213,17 @@
             }
         }
 
-        function openFilePicker(name) {
+        function openFilePicker() {
             try {
-                // NO setQuery — the Picker's search is GLOBAL (ignores
-                // setParent) and surfaces same-named files from OTHER folders
-                // (e.g. two config.json), risking linking the wrong file.
-                // setParent scopes the view to ONLY the selected folder.
+                // LIST mode (sortable by name). setParent scopes the view to the
+                // selected folder; NO setQuery (its search is GLOBAL — ignores
+                // setParent and surfaces same-named files from other folders).
                 var view = new google.picker.DocsView(google.picker.ViewId.DOCS)
                     .setMimeTypes('application/json')
                     .setIncludeFolders(false).setSelectFolderEnabled(false);
+                if (google.picker.DocsViewMode && google.picker.DocsViewMode.LIST) {
+                    view.setMode(google.picker.DocsViewMode.LIST);
+                }
                 if (parentFolderId) { view.setParent(parentFolderId); }
                 var picker = new google.picker.PickerBuilder()
                     .setAppId(APP_ID).setOAuthToken(accessToken).setDeveloperKey(API_KEY)
@@ -231,13 +233,25 @@
                         if (data.action !== google.picker.Action.PICKED) return; // CANCEL → stay on checklist
                         var doc = (data.docs || [])[0];
                         if (!doc) return;
-                        if (doc.name !== name) {
-                            showError('That was “' + doc.name + '”. Please pick “' + name + '”.');
+                        var nm = doc.name;
+                        // Safety net: if the Picker reports a parent and it isn't
+                        // the selected folder, the user navigated elsewhere.
+                        if (parentFolderId && doc.parentId && doc.parentId !== parentFolderId) {
+                            alert('Please pick “' + nm + '” inside the folder you selected, not another location.');
                             return;
                         }
-                        document.getElementById('error').style.display = 'none';
-                        picked[name] = { id: doc.id, name: doc.name };
-                        log('linked ' + name);
+                        // Match on NAME (not which button opened the picker):
+                        // pick any of the needed files, in any order.
+                        if (picked[nm] || haveNames.indexOf(nm) !== -1) {
+                            alert('“' + nm + '” is already linked.');
+                            return;
+                        }
+                        if (needNames.indexOf(nm) === -1) {
+                            alert('“' + nm + '” isn’t one of the Leadership Tracker files. Please pick one of the files shown in the list.');
+                            return;
+                        }
+                        picked[nm] = { id: doc.id, name: nm };
+                        log('linked ' + nm);
                         renderList();
                         updateProgress();
                     });
