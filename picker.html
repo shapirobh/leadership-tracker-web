@@ -5,12 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leadership Tracker — Picker</title>
     <style>
+        /* Body is FULL-WIDTH so the Google Picker (which injects its dialog into
+           <body>) always gets the full viewport. A narrow/centered body squeezed
+           the picker's layout to blank on wider screens. The readable text column
+           lives in .content instead. */
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            color: #333;
+        }
+        .content {
             padding: 32px 20px;
             max-width: 480px;
             margin: 0 auto;
-            color: #333;
         }
         h2 { text-align: center; margin-bottom: 16px; }
         .intro { text-align: center; color: #555; margin-bottom: 24px; line-height: 1.5; }
@@ -50,6 +57,7 @@
     </style>
 </head>
 <body>
+    <div class="content">
     <h2 id="heading">Leadership Tracker</h2>
     <p class="intro" id="intro"></p>
 
@@ -76,6 +84,7 @@
     </div>
     <p id="status"></p>
     <p id="error"></p>
+    </div>
 
     <script>
         var APP_SCHEME = 'com.bshapiro.leadershiptracker';
@@ -236,21 +245,8 @@
             buildAndShowPicker();
         }
 
-        // Hide this page's own content before showing the picker. The Google
-        // Picker positions its dialog relative to the document; on a tall page
-        // (e.g. folder mode with all the instructional steps) the dialog lands
-        // below the fold and looks blank. Hiding our content + scrolling to top
-        // gives the picker a clean, short body to render into.
-        function hidePageChrome() {
-            Array.prototype.forEach.call(document.body.children, function(el) {
-                if (el.tagName !== 'SCRIPT') el.style.display = 'none';
-            });
-            window.scrollTo(0, 0);
-        }
-
         function buildAndShowPicker() {
             try {
-                hidePageChrome();
                 var builder = new google.picker.PickerBuilder()
                     .setAppId(appId)
                     .setOAuthToken(accessToken)
