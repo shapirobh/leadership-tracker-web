@@ -161,7 +161,7 @@
         function setupFilesMode() {
             document.getElementById('heading').textContent = 'Select Your Files';
             document.getElementById('intro').textContent =
-                'Tap “Select”, choose a file from your folder, and it links automatically — pick them in any order. A green check appears here as each one is linked.';
+                'Tap “Select” beside a file — the picker opens to just that file. Tap it to link it; a green check appears here. If more than one shows up, pick the one in the folder you selected.';
             document.getElementById('progress').style.display = 'block';
             renderList();
             updateProgress();
@@ -192,7 +192,7 @@
                 var btn = document.createElement('button');
                 btn.className = 'selectBtn'; btn.textContent = 'Select';
                 btn.disabled = !ready();
-                btn.onclick = function() { ensureToken(openFilePicker); };
+                btn.onclick = function() { ensureToken(function() { openFilePicker(name); }); };
                 div.appendChild(btn);
             }
             return div;
@@ -213,18 +213,50 @@
             }
         }
 
-        function openFilePicker() {
+        // Record a confirmed pick (right name, right folder).
+        function acceptPick(doc) {
+            var nm = doc.name;
+            if (needNames.indexOf(nm) === -1) { alert('“' + nm + '” isn’t one of the Leadership Tracker files.'); return; }
+            if (picked[nm] || haveNames.indexOf(nm) !== -1) { alert('“' + nm + '” is already linked.'); return; }
+            picked[nm] = { id: doc.id, name: nm };
+            log('linked ' + nm);
+            renderList();
+            updateProgress();
+        }
+        function rejectWrongFolder(nm) {
+            alert('“' + nm + '” is in a different folder. Please pick the “' + nm + '” that is inside the folder you selected.');
+        }
+        // Confirm the picked file lives in the selected folder. Prefer the
+        // Picker's parentId; if it isn't provided, verify via the Drive API
+        // (the app can read a just-picked file under drive.file).
+        function checkParentThenAccept(doc) {
+            if (!parentFolderId) { acceptPick(doc); return; }
+            if (doc.parentId) {
+                if (doc.parentId === parentFolderId) acceptPick(doc); else rejectWrongFolder(doc.name);
+                return;
+            }
+            fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(doc.id) + '?fields=parents&supportsAllDrives=true', {
+                headers: { Authorization: 'Bearer ' + accessToken },
+            }).then(function(r) { return r.json(); }).then(function(meta) {
+                var parents = (meta && meta.parents) || [];
+                if (parents.indexOf(parentFolderId) !== -1) acceptPick(doc); else rejectWrongFolder(doc.name);
+            }).catch(function() { acceptPick(doc); }); // can't verify → trust the location column
+        }
+
+        function openFilePicker(name) {
             try {
-                // LIST mode (sortable by name). setParent scopes the view to the
-                // selected folder; NO setQuery (its search is GLOBAL — ignores
-                // setParent and surfaces same-named files from other folders).
+                // FILTER to just this filename (setQuery) so the user doesn't
+                // scroll. setQuery searches GLOBALLY (ignores setParent), so the
+                // same name from another folder can appear — the Picker's LIST
+                // view shows a Location column, and the parent check below
+                // rejects a pick from the wrong folder.
                 var view = new google.picker.DocsView(google.picker.ViewId.DOCS)
                     .setMimeTypes('application/json')
+                    .setQuery(name)
                     .setIncludeFolders(false).setSelectFolderEnabled(false);
                 if (google.picker.DocsViewMode && google.picker.DocsViewMode.LIST) {
                     view.setMode(google.picker.DocsViewMode.LIST);
                 }
-                if (parentFolderId) { view.setParent(parentFolderId); }
                 var picker = new google.picker.PickerBuilder()
                     .setAppId(APP_ID).setOAuthToken(accessToken).setDeveloperKey(API_KEY)
                     .setOrigin(window.location.protocol + '//' + window.location.host)
@@ -232,28 +264,7 @@
                     .setCallback(function(data) {
                         if (data.action !== google.picker.Action.PICKED) return; // CANCEL → stay on checklist
                         var doc = (data.docs || [])[0];
-                        if (!doc) return;
-                        var nm = doc.name;
-                        // Safety net: if the Picker reports a parent and it isn't
-                        // the selected folder, the user navigated elsewhere.
-                        if (parentFolderId && doc.parentId && doc.parentId !== parentFolderId) {
-                            alert('Please pick “' + nm + '” inside the folder you selected, not another location.');
-                            return;
-                        }
-                        // Match on NAME (not which button opened the picker):
-                        // pick any of the needed files, in any order.
-                        if (picked[nm] || haveNames.indexOf(nm) !== -1) {
-                            alert('“' + nm + '” is already linked.');
-                            return;
-                        }
-                        if (needNames.indexOf(nm) === -1) {
-                            alert('“' + nm + '” isn’t one of the Leadership Tracker files. Please pick one of the files shown in the list.');
-                            return;
-                        }
-                        picked[nm] = { id: doc.id, name: nm };
-                        log('linked ' + nm);
-                        renderList();
-                        updateProgress();
+                        if (doc) checkParentThenAccept(doc);
                     });
                 picker.build().setVisible(true);
             } catch (e) { showError('Could not open the picker: ' + (e && e.message ? e.message : e)); }
