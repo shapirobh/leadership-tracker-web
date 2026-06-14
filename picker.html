@@ -31,6 +31,9 @@
     <div class="note" id="folderWarning" style="display:none;">
         Only share this folder with the <strong>named Google accounts</strong> of your leadership team — never "Anyone with the link."
     </div>
+    <div class="note" id="filesWhy" style="display:none;">
+        <strong>Why one file at a time?</strong> To keep your information private, Google only lets an app open files you pick yourself. So you grant this app access to each of your unit's files once, right here — a one-time setup that takes about a minute, and you won't have to do it again. Tap <strong>Select</strong> next to a file, choose it, and a green check appears. If two files share a name, pick the one inside the folder you selected.
+    </div>
 
     <!-- Folder mode: single button. -->
     <button id="go" class="btn" style="display:none;" disabled>Loading…</button>
@@ -159,9 +162,10 @@
 
         // ================= FILES MODE (per-file checklist) =================
         function setupFilesMode() {
-            document.getElementById('heading').textContent = 'Select Your Files';
+            document.getElementById('heading').textContent = 'Link Your Unit’s Files';
             document.getElementById('intro').textContent =
-                'Tap “Select” beside a file — the picker opens to just that file. Tap it to link it; a green check appears here. If more than one shows up, pick the one in the folder you selected.';
+                'One-time setup to connect this device to your unit’s shared data.';
+            document.getElementById('filesWhy').style.display = 'block';
             document.getElementById('progress').style.display = 'block';
             renderList();
             updateProgress();
