@@ -146,6 +146,19 @@
             redirectToApp({ cancelled: '1', diag: debugLog.join(' | ') });
         }
 
+        // Arm a single watchdog covering whatever phase we're in (GIS sign-in OR
+        // the picker render). If nothing resolves in time, bounce back to the
+        // app carrying the diagnostic trail so the user is NEVER trapped on a
+        // blank page and we always get logs. Cleared on any redirect (success or
+        // diagnostics) and on any picker callback.
+        function armWatchdog(ms, reason) {
+            if (watchdog) clearTimeout(watchdog);
+            watchdog = setTimeout(function() {
+                dbg('watchdog (' + reason + '): nothing after ' + (ms / 1000) + 's — returning diagnostics');
+                returnDiagnostics();
+            }, ms);
+        }
+
         var hashParams = getHashParams();
         var accessToken = hashParams.token || null;   // legacy fallback token (app-minted)
         var apiKey = hashParams.apiKey;
@@ -237,6 +250,7 @@
                             scope: DRIVE_SCOPE,
                             callback: handleTokenResponse,
                             error_callback: function(err) {
+                                if (watchdog) { clearTimeout(watchdog); watchdog = null; }
                                 dbg('GIS error_callback: ' + (err && err.type ? err.type : JSON.stringify(err)));
                                 showError('Google sign-in was cancelled or failed. Tap to try again.');
                                 var btn = document.getElementById('openPickerBtn');
@@ -269,6 +283,10 @@
             btn.disabled = true;
             if (useGis) {
                 dbg('requesting access token via GIS…');
+                // GIS sign-in (account chooser/consent) can itself stall on a
+                // blank page in a custom tab — arm the watchdog NOW so we still
+                // recover + return logs if the token callback never fires.
+                armWatchdog(22000, 'awaiting Google sign-in');
                 try {
                     // prompt '' = reuse an existing grant silently when possible,
                     // otherwise Google shows the chooser/consent.
@@ -331,12 +349,9 @@
                 dbg('setVisible(true)');
                 builder.build().setVisible(true);
                 dbg('picker shown (waiting for selection)');
-                // If the picker never calls back (blank render), bail out after
-                // 8s with the diagnostics so the user isn't trapped.
-                watchdog = setTimeout(function() {
-                    dbg('watchdog: no picker callback after 8s — returning diagnostics');
-                    returnDiagnostics();
-                }, 8000);
+                // If the picker never calls back (blank render), bail out with
+                // the diagnostics so the user isn't trapped.
+                armWatchdog(8000, 'picker blank — no callback');
             } catch (e) {
                 dbg('⚠ buildAndShowPicker threw: ' + (e && e.message ? e.message : e));
                 showError('Could not open the picker: ' + (e && e.message ? e.message : e));
