@@ -249,6 +249,10 @@
 
         function openFilePicker(name) {
             try {
+                // The Picker dialog anchors to the current scroll position; on a
+                // tall (scrolled) page its top gets clipped. Reset to the top
+                // first so it opens fully in view.
+                try { window.scrollTo(0, 0); } catch (e) { /* ignore */ }
                 // FILTER to just this filename (setQuery) so the user doesn't
                 // scroll. setQuery searches GLOBALLY (ignores setParent), so the
                 // same name from another folder can appear — the Picker's LIST
