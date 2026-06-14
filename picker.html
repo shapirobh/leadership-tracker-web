@@ -5,78 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leadership Tracker — Picker</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            color: #333;
-        }
-        .content { padding: 32px 20px; max-width: 480px; margin: 0 auto; }
-        h2 { text-align: center; margin-bottom: 16px; }
-        .intro { text-align: center; color: #555; margin-bottom: 24px; line-height: 1.5; }
-        .steps {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 16px 20px;
-            margin-bottom: 24px;
-            line-height: 1.6;
-        }
-        .steps p { margin: 10px 0; }
-        .steps strong { color: #1a73e8; }
-        .warning {
-            background: #fff8e1;
-            border-left: 4px solid #f5b400;
-            border-radius: 4px;
-            padding: 12px 16px;
-            margin-bottom: 24px;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-        .btn-container { text-align: center; margin: 24px 0; }
-        .btn {
-            background: #1a73e8;
-            color: white;
-            border: none;
-            padding: 14px 32px;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            min-width: 240px;
-        }
-        .btn:active { background: #1557b0; }
-        .btn:disabled { background: #ccc; cursor: default; }
-        #status { text-align: center; margin: 16px 0; color: #666; display: none; }
-        #error { color: #EA4335; text-align: center; margin: 16px 0; display: none; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; max-width: 680px; margin: 0 auto; color: #222; }
+        h2 { margin-bottom: 8px; }
+        .intro { color: #555; margin-bottom: 16px; line-height: 1.5; }
+        .steps { background: #f8f9fa; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; line-height: 1.5; font-size: 14px; }
+        .steps p { margin: 8px 0; }
+        .warning { background: #fff8e1; border-left: 4px solid #f5b400; border-radius: 4px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; line-height: 1.4; }
+        .btn { background: #1a73e8; color: #fff; border: none; padding: 14px 28px; border-radius: 8px; font-size: 16px; cursor: pointer; min-width: 240px; }
+        .btn:disabled { background: #bbb; cursor: default; }
+        #status { margin: 16px 0; color: #666; display: none; }
+        #error { color: #EA4335; margin: 16px 0; display: none; }
     </style>
 </head>
 <body>
-    <div class="content">
     <h2 id="heading">Leadership Tracker</h2>
     <p class="intro" id="intro"></p>
 
-    <div class="steps" id="folderSteps" style="display:none;">
-        <p><strong>If you haven't created a folder yet:</strong></p>
-        <p>1. Open <a href="https://drive.google.com" target="_blank">Google Drive</a> in a new tab.</p>
-        <p>2. Create a new, empty folder (e.g., "Ward Leadership" or "Stake Presidency").</p>
-        <p>3. Right-click the folder, select "Share," and add each member of your bishopric or presidency as an <strong>Editor</strong>.</p>
-        <p>4. Come back here and tap the button below to select that folder.</p>
+    <div class="steps" id="filesSteps" style="display:none;">
+        <p><strong>Select all eight Leadership Tracker files</strong> in this folder:</p>
+        <p style="font-family:monospace;font-size:12px;color:#1a73e8;">config.json, members.json, callings.json, callings-archive.json, interviews.json, interviews-archive.json, programs.json, programs-archive.json</p>
     </div>
 
     <div class="warning" id="folderWarning" style="display:none;">
-        <strong>Important:</strong> Only share the folder with named accounts of your leadership team. Never set it to "Anyone with the link."
+        Only share the folder with named accounts of your leadership team — never "Anyone with the link."
     </div>
 
-    <div class="steps" id="filesSteps" style="display:none;">
-        <p><strong>Select every Leadership Tracker file in this folder.</strong></p>
-        <p>Tap the button, then select <strong>all of them</strong> — the picker is already inside your folder and shows only the app's files. They are:</p>
-        <p style="font-family:monospace;font-size:13px;color:#1a73e8;">config.json, members.json,<br>callings.json, callings-archive.json,<br>interviews.json, interviews-archive.json,<br>programs.json, programs-archive.json</p>
-    </div>
-
-    <div class="btn-container">
-        <button id="openPickerBtn" class="btn" disabled>Loading…</button>
-    </div>
+    <button id="openPickerBtn" class="btn" disabled>Loading…</button>
     <p id="status"></p>
     <p id="error"></p>
-    </div>
 
     <script>
         var APP_SCHEME = 'com.bshapiro.leadershiptracker';
@@ -114,29 +70,23 @@
         }
 
         var hashParams = getHashParams();
-        var accessToken = hashParams.token || null;   // legacy fallback token
+        var accessToken = hashParams.token || null;
         var apiKey = hashParams.apiKey;
         var appId = hashParams.appId;
-        var clientId = hashParams.clientId || null;    // Web OAuth client id (GIS)
+        var clientId = hashParams.clientId || null;
         var mode = hashParams.mode === 'files' ? 'files' : 'folder';
         var parent = hashParams.parent || null;
         var useGis = !!clientId;
 
-        // Tailor the copy to the mode.
+        document.getElementById('heading').textContent = mode === 'files' ? 'Select Your Files' : 'Select Your Folder';
         if (mode === 'files') {
-            document.getElementById('heading').textContent = 'Select Your Files';
-            document.getElementById('intro').textContent =
-                'Adopt the Leadership Tracker files the organizer set up in your shared folder.';
+            document.getElementById('intro').textContent = 'Adopt the Leadership Tracker files in your shared folder.';
             document.getElementById('filesSteps').style.display = 'block';
         } else {
-            document.getElementById('heading').textContent = 'Select Your Folder';
-            document.getElementById('intro').textContent =
-                'Choose the Google Drive folder where Leadership Tracker stores your unit data.';
-            document.getElementById('folderSteps').style.display = 'block';
+            document.getElementById('intro').textContent = 'Choose the Google Drive folder where your unit data is stored.';
             document.getElementById('folderWarning').style.display = 'block';
         }
 
-        // --- Loading + enabling (mirrors the verified-working test page) -------
         var pickerReady = false, gisReady = false, tokenClient = null;
         function maybeEnable() {
             if (!pickerReady) return;
@@ -147,59 +97,40 @@
             b.onclick = onGo;
         }
 
-        if (!apiKey || !appId) {
-            showError('Missing required parameters. Please open this page from within the Leadership Tracker app.');
-        } else if (mode === 'files' && !parent) {
-            showError('Missing the folder to open. Please start from the Leadership Tracker app.');
-        } else if (!useGis && !accessToken) {
-            showError('Missing sign-in details. Please update the app and try again.');
+        // Load gapi (picker) + GIS at top level, exactly like the working page.
+        var s1 = document.createElement('script');
+        s1.src = 'https://apis.google.com/js/api.js';
+        s1.onload = function() { gapi.load('picker', function() { pickerReady = true; maybeEnable(); }); };
+        s1.onerror = function() { showError('Failed to load Google APIs. Check your connection and try again.'); };
+        document.body.appendChild(s1);
+
+        if (useGis) {
+            var s2 = document.createElement('script');
+            s2.src = 'https://accounts.google.com/gsi/client';
+            s2.onload = function() { gisReady = true; maybeEnable(); };
+            s2.onerror = function() { showError('Failed to load Google sign-in. Check your connection and try again.'); };
+            document.body.appendChild(s2);
         } else {
-            var s1 = document.createElement('script');
-            s1.src = 'https://apis.google.com/js/api.js';
-            s1.onload = function() { gapi.load('picker', function() { pickerReady = true; maybeEnable(); }); };
-            s1.onerror = function() { showError('Failed to load Google APIs. Check your internet connection and try again.'); };
-            document.body.appendChild(s1);
-
-            if (useGis) {
-                var s2 = document.createElement('script');
-                s2.src = 'https://accounts.google.com/gsi/client';
-                s2.onload = function() { gisReady = true; maybeEnable(); };
-                s2.onerror = function() { showError('Failed to load Google sign-in. Check your internet connection and try again.'); };
-                document.body.appendChild(s2);
-            }
+            gisReady = true;
         }
 
-        // --- Button click: GIS sign-in (on click) then the picker -------------
         function onGo() {
-            var b = document.getElementById('openPickerBtn');
-            b.disabled = true;
             if (!useGis) { openPicker(); return; }
-            try {
-                if (!tokenClient) {
-                    tokenClient = google.accounts.oauth2.initTokenClient({
-                        client_id: clientId,
-                        scope: DRIVE_SCOPE,
-                        callback: function(resp) {
-                            if (resp && resp.error) { showError('Google sign-in failed: ' + resp.error); return; }
-                            if (!resp || !resp.access_token) { showError('Google did not return an access token. Please try again.'); return; }
-                            accessToken = resp.access_token;
-                            openPicker();
-                        },
-                        error_callback: function() {
-                            showError('Google sign-in was cancelled or failed. Tap to try again.');
-                            b.disabled = false;
-                            b.textContent = 'Try Again';
-                        },
-                    });
-                }
-                tokenClient.requestAccessToken({ prompt: '' });
-            } catch (e) {
-                showError('Could not start Google sign-in: ' + (e && e.message ? e.message : e));
-                b.disabled = false;
-            }
+            // Create the token client FRESH on click (exactly like the working page).
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: clientId,
+                scope: DRIVE_SCOPE,
+                callback: function(resp) {
+                    if (resp && resp.error) { showError('Google sign-in failed: ' + resp.error); return; }
+                    if (!resp || !resp.access_token) { showError('Google did not return an access token. Reload and try again.'); return; }
+                    accessToken = resp.access_token;
+                    openPicker();
+                },
+                error_callback: function() { showError('Google sign-in was cancelled or failed. Reload the page to try again.'); },
+            });
+            tokenClient.requestAccessToken({ prompt: '' });
         }
 
-        // --- Build + show the picker (identical to the working test page) -----
         function openPicker() {
             try {
                 var view;
