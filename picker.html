@@ -78,6 +78,16 @@
         var parent = hashParams.parent || null;
         var useGis = !!clientId;
 
+        // Strip the hash from the address bar NOW that the params are parsed.
+        // gapi's iframe RPC (gapi_iframes) derives its relay/origin target from
+        // window.location; a leftover hash corrupts that target and makes
+        // setVisible crash with "Cannot read properties of null (reading
+        // 'postMessage')" — the working test page has no hash, which was the
+        // real difference all along. Keep pathname + search only.
+        try {
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+        } catch (e) { /* non-fatal */ }
+
         document.getElementById('heading').textContent = mode === 'files' ? 'Select Your Files' : 'Select Your Folder';
         if (mode === 'files') {
             document.getElementById('intro').textContent = 'Adopt the Leadership Tracker files in your shared folder.';
