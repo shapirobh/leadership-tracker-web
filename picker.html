@@ -76,31 +76,12 @@
     </div>
     <p id="status"></p>
     <p id="error"></p>
-    <pre id="debug" style="display:none;background:#1e1e1e;color:#9cdcfe;font-size:11px;line-height:1.5;padding:10px;border-radius:6px;white-space:pre-wrap;word-break:break-all;margin-top:20px;"></pre>
 
     <script>
         var APP_SCHEME = 'com.bshapiro.leadershiptracker';
         var FOLDER_MIME = 'application/vnd.google-apps.folder';
         // 🔒 Scope is LOCKED to drive.file (matches the app — never widen it).
         var DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
-
-        // On-device diagnostics: the system browser's console is unreachable on
-        // a phone, so echo the picker lifecycle to a visible panel AND carry it
-        // back to the app's log buffer if the picker stalls (see returnDiagnostics).
-        var debugLog = [];
-        function dbg(msg) {
-            debugLog.push(msg);
-            var el = document.getElementById('debug');
-            el.style.display = 'block';
-            el.textContent += msg + '\n';
-        }
-        window.addEventListener('error', function(e) {
-            dbg('⚠ JS error: ' + (e.message || e) + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : ''));
-        });
-        window.addEventListener('unhandledrejection', function(e) {
-            var r = e.reason;
-            dbg('⚠ promise rejection: ' + (r && r.message ? r.message : JSON.stringify(r)));
-        });
 
         function getHashParams() {
             var hash = window.location.hash.substring(1);
@@ -124,39 +105,11 @@
             btn.textContent = 'Error';
         }
 
-        var redirected = false;
-        var watchdog = null;
         function redirectToApp(params) {
-            if (redirected) return;
-            redirected = true;
-            if (watchdog) { clearTimeout(watchdog); watchdog = null; }
             var query = Object.keys(params).map(function(k) {
                 return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
             }).join('&');
             window.location.href = APP_SCHEME + '://folder?' + query;
-        }
-
-        // Diagnostic escape hatch: a blank Google Picker covers the whole page
-        // (this debug panel included) and never fires a callback, trapping the
-        // user. If no picker callback arrives shortly after we show it, return
-        // to the app carrying the diagnostic trail so it lands in the in-app log
-        // buffer (Settings → Share Logs). A picker that DOES come alive fires a
-        // callback, which cancels this — so a working picker is never interrupted.
-        function returnDiagnostics() {
-            redirectToApp({ cancelled: '1', diag: debugLog.join(' | ') });
-        }
-
-        // Arm a single watchdog covering whatever phase we're in (GIS sign-in OR
-        // the picker render). If nothing resolves in time, bounce back to the
-        // app carrying the diagnostic trail so the user is NEVER trapped on a
-        // blank page and we always get logs. Cleared on any redirect (success or
-        // diagnostics) and on any picker callback.
-        function armWatchdog(ms, reason) {
-            if (watchdog) clearTimeout(watchdog);
-            watchdog = setTimeout(function() {
-                dbg('watchdog (' + reason + '): nothing after ' + (ms / 1000) + 's — returning diagnostics');
-                returnDiagnostics();
-            }, ms);
         }
 
         var hashParams = getHashParams();
@@ -168,13 +121,6 @@
         // the fixed file set inside `parent`). The app drives which mode it needs.
         var mode = hashParams.mode === 'files' ? 'files' : 'folder';
         var parent = hashParams.parent || null;
-
-        dbg('mode=' + mode + ' parent=' + (parent || '(none)'));
-        dbg('origin=' + window.location.origin);
-        dbg('apiKey=' + (apiKey ? apiKey.slice(0, 8) + '…' : '(MISSING)') +
-            ' appId=' + (appId || '(MISSING)') +
-            ' clientId=' + (clientId ? clientId.slice(0, 12) + '…' : '(none)') +
-            ' token=' + (accessToken ? 'present(' + accessToken.length + ')' : '(none)'));
 
         // Tailor the copy to the mode.
         if (mode === 'files') {
@@ -192,22 +138,17 @@
 
         // Token strategy:
         //  - PREFERRED (clientId present): acquire the access token IN THE
-        //    BROWSER via Google Identity Services. This establishes the Google
-        //    session the Picker iframe needs (a native-app-minted token with no
-        //    in-browser session makes the Picker render blank with a cross-origin
-        //    "Script error") AND yields a token the Picker accepts.
-        //  - FALLBACK (no clientId): use the app-passed token directly (the old
-        //    behaviour), so an older app build still works.
+        //    BROWSER via Google Identity Services, so the picker runs with a
+        //    token + session it accepts.
+        //  - FALLBACK (no clientId): use the app-passed token directly.
         var useGis = !!clientId;
 
-        // Load the Picker module (needed in both strategies).
         var pickerReady = false;
         var authReady = false;
         var tokenClient = null;
 
-        function bothReady() { return pickerReady && authReady; }
         function enableButton() {
-            if (!bothReady()) return;
+            if (!(pickerReady && authReady)) return;
             var btn = document.getElementById('openPickerBtn');
             btn.disabled = false;
             btn.textContent = mode === 'files' ? 'Open File Picker' : 'Open Folder Picker';
@@ -225,33 +166,24 @@
             var gapiScript = document.createElement('script');
             gapiScript.src = 'https://apis.google.com/js/api.js';
             gapiScript.onload = function() {
-                dbg('api.js loaded; loading picker module…');
-                gapi.load('picker', function() {
-                    dbg('picker module loaded');
-                    pickerReady = true;
-                    enableButton();
-                });
+                gapi.load('picker', function() { pickerReady = true; enableButton(); });
             };
             gapiScript.onerror = function() {
                 showError('Failed to load Google APIs. Check your internet connection and try again.');
             };
             document.body.appendChild(gapiScript);
 
-            // 2) Auth: GIS token client, or skip straight to ready in the
-            //    fallback path.
+            // 2) Auth: GIS token client, or straight to ready in the fallback path.
             if (useGis) {
                 var gisScript = document.createElement('script');
                 gisScript.src = 'https://accounts.google.com/gsi/client';
                 gisScript.onload = function() {
-                    dbg('GIS loaded; initialising token client');
                     try {
                         tokenClient = google.accounts.oauth2.initTokenClient({
                             client_id: clientId,
                             scope: DRIVE_SCOPE,
                             callback: handleTokenResponse,
-                            error_callback: function(err) {
-                                if (watchdog) { clearTimeout(watchdog); watchdog = null; }
-                                dbg('GIS error_callback: ' + (err && err.type ? err.type : JSON.stringify(err)));
+                            error_callback: function() {
                                 showError('Google sign-in was cancelled or failed. Tap to try again.');
                                 var btn = document.getElementById('openPickerBtn');
                                 btn.disabled = false;
@@ -261,7 +193,6 @@
                         authReady = true;
                         enableButton();
                     } catch (e) {
-                        dbg('⚠ initTokenClient threw: ' + (e && e.message ? e.message : e));
                         showError('Could not initialise Google sign-in: ' + (e && e.message ? e.message : e));
                     }
                 };
@@ -275,24 +206,15 @@
             }
         }
 
-        // Button tapped: in the GIS path, request a fresh in-browser token (this
-        // may show the Google account chooser / consent); in the fallback path,
-        // go straight to the picker with the app-passed token.
         function onPickClicked() {
             var btn = document.getElementById('openPickerBtn');
             btn.disabled = true;
             if (useGis) {
-                dbg('requesting access token via GIS…');
-                // GIS sign-in (account chooser/consent) can itself stall on a
-                // blank page in a custom tab — arm the watchdog NOW so we still
-                // recover + return logs if the token callback never fires.
-                armWatchdog(22000, 'awaiting Google sign-in');
                 try {
                     // prompt '' = reuse an existing grant silently when possible,
                     // otherwise Google shows the chooser/consent.
                     tokenClient.requestAccessToken({ prompt: '' });
                 } catch (e) {
-                    dbg('⚠ requestAccessToken threw: ' + (e && e.message ? e.message : e));
                     showError('Could not start Google sign-in: ' + (e && e.message ? e.message : e));
                     btn.disabled = false;
                 }
@@ -303,23 +225,19 @@
 
         function handleTokenResponse(resp) {
             if (resp && resp.error) {
-                dbg('GIS token error: ' + resp.error);
                 showError('Google sign-in failed: ' + resp.error);
                 return;
             }
             if (!resp || !resp.access_token) {
-                dbg('GIS returned no access_token');
                 showError('Google did not return an access token. Please try again.');
                 return;
             }
             accessToken = resp.access_token;
-            dbg('GIS token acquired (' + accessToken.length + ' chars)');
             buildAndShowPicker();
         }
 
         function buildAndShowPicker() {
             try {
-                dbg('building picker…');
                 var builder = new google.picker.PickerBuilder()
                     .setAppId(appId)
                     .setOAuthToken(accessToken)
@@ -346,24 +264,13 @@
                         .setTitle('Select your shared folder');
                 }
 
-                dbg('setVisible(true)');
                 builder.build().setVisible(true);
-                dbg('picker shown (waiting for selection)');
-                // If the picker never calls back (blank render), bail out with
-                // the diagnostics so the user isn't trapped.
-                armWatchdog(8000, 'picker blank — no callback');
             } catch (e) {
-                dbg('⚠ buildAndShowPicker threw: ' + (e && e.message ? e.message : e));
                 showError('Could not open the picker: ' + (e && e.message ? e.message : e));
             }
         }
 
         function pickerCallback(data) {
-            // Any callback means the picker is alive — cancel the blank-render
-            // watchdog so it never interrupts a working pick.
-            if (watchdog) { clearTimeout(watchdog); watchdog = null; }
-            dbg('callback action=' + data.action +
-                (data.docs ? ' docs=' + data.docs.length : ''));
             if (data.action !== google.picker.Action.PICKED) return;
 
             if (mode === 'files') {
