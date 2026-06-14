@@ -236,8 +236,21 @@
             buildAndShowPicker();
         }
 
+        // Hide this page's own content before showing the picker. The Google
+        // Picker positions its dialog relative to the document; on a tall page
+        // (e.g. folder mode with all the instructional steps) the dialog lands
+        // below the fold and looks blank. Hiding our content + scrolling to top
+        // gives the picker a clean, short body to render into.
+        function hidePageChrome() {
+            Array.prototype.forEach.call(document.body.children, function(el) {
+                if (el.tagName !== 'SCRIPT') el.style.display = 'none';
+            });
+            window.scrollTo(0, 0);
+        }
+
         function buildAndShowPicker() {
             try {
+                hidePageChrome();
                 var builder = new google.picker.PickerBuilder()
                     .setAppId(appId)
                     .setOAuthToken(accessToken)
@@ -254,14 +267,12 @@
                         .setIncludeFolders(false)
                         .setSelectFolderEnabled(false);
                     builder.addView(filesView)
-                        .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-                        .setTitle('Select all the Leadership Tracker files');
+                        .enableFeature(google.picker.Feature.MULTISELECT_ENABLED);
                 } else {
                     var folderView = new google.picker.DocsView()
                         .setIncludeFolders(true)
                         .setSelectFolderEnabled(true);
-                    builder.addView(folderView)
-                        .setTitle('Select your shared folder');
+                    builder.addView(folderView);
                 }
 
                 builder.build().setVisible(true);
