@@ -186,24 +186,14 @@
             if (useGis) {
                 var gisScript = document.createElement('script');
                 gisScript.src = 'https://accounts.google.com/gsi/client';
+                // Only mark GIS ready here — do NOT initTokenClient yet. Creating
+                // the token client at load time (while gapi/picker are still
+                // initialising) corrupts the picker's migration shim and makes
+                // setVisible throw "_.zb is not a function". The working test page
+                // creates it on click; mirror that (see onPickClicked).
                 gisScript.onload = function() {
-                    try {
-                        tokenClient = google.accounts.oauth2.initTokenClient({
-                            client_id: clientId,
-                            scope: DRIVE_SCOPE,
-                            callback: handleTokenResponse,
-                            error_callback: function() {
-                                showError('Google sign-in was cancelled or failed. Tap to try again.');
-                                var btn = document.getElementById('openPickerBtn');
-                                btn.disabled = false;
-                                btn.textContent = 'Try Again';
-                            },
-                        });
-                        authReady = true;
-                        enableButton();
-                    } catch (e) {
-                        showError('Could not initialise Google sign-in: ' + (e && e.message ? e.message : e));
-                    }
+                    authReady = true;
+                    enableButton();
                 };
                 gisScript.onerror = function() {
                     showError('Failed to load Google sign-in. Check your internet connection and try again.');
@@ -220,6 +210,21 @@
             btn.disabled = true;
             if (useGis) {
                 try {
+                    // Create the token client lazily, ON CLICK — gapi/picker have
+                    // fully settled by now, avoiding the load-time GIS↔gapi clash
+                    // that crashed the picker. Matches the working test page.
+                    if (!tokenClient) {
+                        tokenClient = google.accounts.oauth2.initTokenClient({
+                            client_id: clientId,
+                            scope: DRIVE_SCOPE,
+                            callback: handleTokenResponse,
+                            error_callback: function() {
+                                showError('Google sign-in was cancelled or failed. Tap to try again.');
+                                btn.disabled = false;
+                                btn.textContent = 'Try Again';
+                            },
+                        });
+                    }
                     // prompt '' = reuse an existing grant silently when possible,
                     // otherwise Google shows the chooser/consent.
                     tokenClient.requestAccessToken({ prompt: '' });
