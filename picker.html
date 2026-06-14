@@ -137,7 +137,7 @@
 
         function openPicker() {
             try {
-                log('building picker…');
+                log('building picker… mode=' + mode);
                 var view;
                 if (mode === 'files') {
                     view = new google.picker.DocsView(google.picker.ViewId.DOCS)
@@ -146,26 +146,32 @@
                 } else {
                     view = new google.picker.DocsView().setIncludeFolders(true).setSelectFolderEnabled(true);
                 }
-                var picker = new google.picker.PickerBuilder()
+                var builder = new google.picker.PickerBuilder()
                     .setAppId(APP_ID)
                     .setOAuthToken(accessToken)
                     .setDeveloperKey(API_KEY)
-                    .setOrigin(window.location.protocol + '//' + window.location.host)
-                    .addView(view)
-                    .setCallback(function(data) {
-                        log('callback action=' + data.action + (data.docs ? ' docs=' + data.docs.length : ''));
-                        if (data.action === google.picker.Action.CANCEL) { redirectToApp({ cancelled: '1' }); return; }
-                        if (data.action !== google.picker.Action.PICKED) return;
-                        if (mode === 'files') {
-                            var files = (data.docs || []).map(function(d) { return { id: d.id, name: d.name }; });
-                            redirectToApp({ files: JSON.stringify(files) });
-                        } else {
-                            var doc = data.docs[0];
-                            if (doc && doc.mimeType === FOLDER_MIME) { redirectToApp({ id: doc.id, name: doc.name }); }
-                        }
-                    });
-                if (mode === 'files') { picker = picker.enableFeature(google.picker.Feature.MULTISELECT_ENABLED); }
-                picker = picker.build();
+                    .setOrigin(window.location.protocol + '//' + window.location.host);
+                // Enable multi-select BEFORE addView — the view bakes in its
+                // selection behavior when added, so enabling the feature
+                // afterward is ignored (was the single-select bug). Order
+                // matches Google's canonical Picker example.
+                if (mode === 'files') {
+                    builder.enableFeature(google.picker.Feature.MULTISELECT_ENABLED);
+                    log('multiselect feature=' + google.picker.Feature.MULTISELECT_ENABLED);
+                }
+                builder.addView(view).setCallback(function(data) {
+                    log('callback action=' + data.action + (data.docs ? ' docs=' + data.docs.length : ''));
+                    if (data.action === google.picker.Action.CANCEL) { redirectToApp({ cancelled: '1' }); return; }
+                    if (data.action !== google.picker.Action.PICKED) return;
+                    if (mode === 'files') {
+                        var files = (data.docs || []).map(function(d) { return { id: d.id, name: d.name }; });
+                        redirectToApp({ files: JSON.stringify(files) });
+                    } else {
+                        var doc = data.docs[0];
+                        if (doc && doc.mimeType === FOLDER_MIME) { redirectToApp({ id: doc.id, name: doc.name }); }
+                    }
+                });
+                var picker = builder.build();
                 log('setVisible(true)');
                 picker.setVisible(true);
                 log('picker shown');
