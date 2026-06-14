@@ -134,7 +134,12 @@
                     if (resp && resp.error) { showError('Google sign-in failed: ' + resp.error); return; }
                     if (!resp || !resp.access_token) { showError('Google did not return an access token. Reload and try again.'); return; }
                     accessToken = resp.access_token;
-                    openPicker();
+                    // Defer OUT of GIS's token-callback stack: opening the picker
+                    // synchronously here makes gapi's iframe RPC postMessage while
+                    // GIS's own popup handler is still on the stack, which nulls
+                    // the target window ("Cannot read properties of null (reading
+                    // 'postMessage')"). Let GIS unwind first.
+                    setTimeout(openPicker, 0);
                 },
                 error_callback: function() { showError('Google sign-in was cancelled or failed. Reload the page to try again.'); },
             });
