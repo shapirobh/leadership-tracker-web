@@ -9,10 +9,19 @@
         h2 { margin-bottom: 4px; }
         .intro { color: #555; margin: 8px 0 16px; line-height: 1.5; }
         .note { background: #fff8e1; border-left: 4px solid #f5b400; padding: 12px 16px; border-radius: 4px; margin: 16px 0; line-height: 1.5; font-size: 14px; }
-        .note code { font-size: 12px; color: #1a73e8; word-break: break-all; }
         .btn { background: #1a73e8; color: #fff; border: none; padding: 14px 28px; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 8px; min-width: 240px; }
         .btn:disabled { background: #bbb; cursor: default; }
         #error { color: #EA4335; margin: 16px 0; display: none; }
+        /* Files-mode checklist */
+        #fileList { margin: 8px 0 16px; }
+        .fileRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 8px; }
+        .fileRow.done { background: #e9f5ea; border-color: #34A853; }
+        .fileName { font-family: monospace; font-size: 13px; word-break: break-all; flex: 1; }
+        .fileStatus { font-size: 22px; line-height: 1; color: #34A853; width: 26px; text-align: center; }
+        .selectBtn { background: #1a73e8; color: #fff; border: none; padding: 9px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; white-space: nowrap; }
+        .selectBtn:disabled { background: #bbb; cursor: default; }
+        #progress { color: #555; font-size: 14px; margin: 8px 0 12px; }
+        #finishBtn { display: none; }
     </style>
 </head>
 <body>
@@ -22,16 +31,19 @@
     <div class="note" id="folderWarning" style="display:none;">
         Only share this folder with the <strong>named Google accounts</strong> of your leadership team — never "Anyone with the link."
     </div>
-    <div class="note" id="filesSteps" style="display:none;">
-        Select <strong>all eight</strong> Leadership Tracker files in this folder:<br>
-        <code>config.json, members.json, callings.json, callings-archive.json, interviews.json, interviews-archive.json, programs.json, programs-archive.json</code>
-    </div>
 
-    <!-- clientId is supplied by the app via the URL hash (hidden, pre-filled). -->
-    <input id="clientId" type="hidden" />
+    <!-- Folder mode: single button. -->
+    <button id="go" class="btn" style="display:none;" disabled>Loading…</button>
 
-    <button id="go" class="btn" disabled>Loading…</button>
+    <!-- Files mode: per-file checklist (rendered in JS). -->
+    <p id="progress" style="display:none;"></p>
+    <div id="fileList"></div>
+    <button id="finishBtn" class="btn">Finish</button>
+
     <p id="error"></p>
+
+    <!-- clientId comes from the URL hash (hidden, pre-filled). -->
+    <input id="clientId" type="hidden" />
 
     <script>
         // Public, referrer-restricted values (the API key only works from
@@ -53,12 +65,11 @@
             });
             return params;
         }
+        function csv(s) { return (s || '').split(',').map(function(x){return x.trim();}).filter(Boolean); }
 
         function showError(msg) {
             var el = document.getElementById('error');
             el.textContent = msg; el.style.display = 'block';
-            var b = document.getElementById('go');
-            b.disabled = true; b.textContent = 'Error';
         }
 
         function redirectToApp(params) {
@@ -68,124 +79,190 @@
             window.location.href = APP_SCHEME + '://folder?' + query;
         }
 
-        var hashParams = getHashParams();
-        var mode = hashParams.mode === 'files' ? 'files' : 'folder';
-        // ⚠️ Do NOT name this `parent` — a global `var parent` clobbers
-        // window.parent, which gapi's iframe RPC posts to, crashing the Picker
-        // with "Cannot read properties of null (reading 'postMessage')".
-        var parentFolderId = hashParams.parent || null;
-        var accessToken = hashParams.token || null;
-        if (hashParams.clientId) { document.getElementById('clientId').value = hashParams.clientId; }
-
-        document.getElementById('heading').textContent = mode === 'files' ? 'Select Your Files' : 'Select Your Folder';
-        if (mode === 'files') {
-            document.getElementById('intro').textContent = 'Adopt the existing Leadership Tracker files in your shared folder.';
-            document.getElementById('filesSteps').style.display = 'block';
-        } else {
-            document.getElementById('intro').textContent = 'Choose the Google Drive folder where your unit data is stored.';
-            document.getElementById('folderWarning').style.display = 'block';
-        }
-
         window.addEventListener('error', function(e) { log('window error: ' + (e.message || e)); });
         window.addEventListener('unhandledrejection', function(e) { var r = e.reason; log('promise rejection: ' + (r && r.message ? r.message : JSON.stringify(r))); });
 
+        var hashParams = getHashParams();
+        var mode = hashParams.mode === 'files' ? 'files' : 'folder';
+        // ⚠️ Do NOT name this `parent` — a global `var parent` clobbers
+        // window.parent, which gapi's iframe RPC posts to, crashing the Picker.
+        var parentFolderId = hashParams.parent || null;
+        var accessToken = hashParams.token || null;
+        var loginHint = hashParams.loginHint || null;
+        var needNames = csv(hashParams.need);   // files to acquire (Select button)
+        var haveNames = csv(hashParams.have);   // files already linked (shown ✓)
+        if (hashParams.clientId) { document.getElementById('clientId').value = hashParams.clientId; }
+
         var pickerReady = false, gisReady = false, tokenClient = null;
-        function maybeEnable() {
-            if (pickerReady && gisReady) {
-                var b = document.getElementById('go');
-                b.disabled = false;
-                b.textContent = mode === 'files' ? 'Open File Picker' : 'Open Folder Picker';
-                b.onclick = onGo;
-            }
-        }
+        var picked = {};   // filename -> { id, name }
 
-        log('origin=' + window.location.origin + ' mode=' + mode);
-
-        var s1 = document.createElement('script');
-        s1.src = 'https://apis.google.com/js/api.js';
-        s1.onload = function() { log('api.js loaded'); gapi.load('picker', function() { log('picker module loaded'); pickerReady = true; maybeEnable(); }); };
-        s1.onerror = function() { showError('Failed to load Google APIs. Check your connection and try again.'); };
-        document.body.appendChild(s1);
-
-        var s2 = document.createElement('script');
-        s2.src = 'https://accounts.google.com/gsi/client';
-        s2.onload = function() { log('GIS loaded'); gisReady = true; maybeEnable(); };
-        s2.onerror = function() { showError('Failed to load Google sign-in. Check your connection and try again.'); };
-        document.body.appendChild(s2);
-
-        function onGo() {
+        // ---- token (acquired once; reused for every per-file picker open) ----
+        function ensureToken(cb) {
+            if (accessToken) { cb(); return; }
             var clientId = document.getElementById('clientId').value.trim();
             if (!clientId) { showError('Missing sign-in configuration. Reopen the picker from the app.'); return; }
             try {
-                tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: clientId,
-                    scope: DRIVE_SCOPE,
-                    callback: function(resp) {
-                        if (resp.error) { showError('Google sign-in failed: ' + resp.error); return; }
-                        accessToken = resp.access_token;
-                        log('token acquired (' + (accessToken ? accessToken.length : 0) + ' chars)');
-                        openPicker();
-                    },
-                    error_callback: function(err) { showError('Google sign-in was cancelled or failed. Reload the page to try again.'); log('GIS error_callback: ' + JSON.stringify(err)); },
-                });
-                log('requesting token…');
+                if (!tokenClient) {
+                    var cfg = {
+                        client_id: clientId,
+                        scope: DRIVE_SCOPE,
+                        callback: function(resp) {
+                            if (resp.error) { showError('Google sign-in failed: ' + resp.error); return; }
+                            accessToken = resp.access_token;
+                            log('token acquired (' + (accessToken ? accessToken.length : 0) + ' chars)');
+                            cb();
+                        },
+                        error_callback: function(err) { showError('Google sign-in was cancelled or failed. Reload to try again.'); log('GIS error_callback: ' + JSON.stringify(err)); },
+                    };
+                    // login_hint pre-selects the account and (when the browser
+                    // carries the session) skips the chooser on every open.
+                    if (loginHint) { cfg.login_hint = loginHint; }
+                    tokenClient = google.accounts.oauth2.initTokenClient(cfg);
+                }
+                log('requesting token…' + (loginHint ? ' (login_hint set)' : ''));
                 tokenClient.requestAccessToken({ prompt: '' });
             } catch (e) {
                 showError('Could not start Google sign-in: ' + (e && e.message ? e.message : e));
             }
         }
 
-        function openPicker() {
+        // ================= FOLDER MODE =================
+        function setupFolderMode() {
+            document.getElementById('heading').textContent = 'Select Your Folder';
+            document.getElementById('intro').textContent = 'Choose the Google Drive folder where your unit data is stored.';
+            document.getElementById('folderWarning').style.display = 'block';
+            var b = document.getElementById('go');
+            b.style.display = 'block';
+            function enable() {
+                if (!pickerReady || !gisReady) return;
+                b.disabled = false; b.textContent = 'Open Folder Picker';
+                b.onclick = function() { ensureToken(openFolderPicker); };
+            }
+            window.__enable = enable;
+        }
+        function openFolderPicker() {
             try {
-                log('building picker… mode=' + mode);
-                var view;
-                if (mode === 'files') {
-                    view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-                        .setMimeTypes('application/json')
-                        .setIncludeFolders(false).setSelectFolderEnabled(false);
-                    // Grid mode renders a tap-to-select check overlay on each
-                    // tile — the only touch multi-select affordance the Picker
-                    // offers (desktop list mode needs Ctrl/Shift, absent on phones).
-                    if (google.picker.DocsViewMode && google.picker.DocsViewMode.GRID) {
-                        view.setMode(google.picker.DocsViewMode.GRID);
-                    }
-                    if (parentFolderId) { view.setParent(parentFolderId); }
-                } else {
-                    view = new google.picker.DocsView().setIncludeFolders(true).setSelectFolderEnabled(true);
-                }
-                var builder = new google.picker.PickerBuilder()
-                    .setAppId(APP_ID)
-                    .setOAuthToken(accessToken)
-                    .setDeveloperKey(API_KEY)
-                    .setOrigin(window.location.protocol + '//' + window.location.host);
-                // Enable multi-select BEFORE addView — the view bakes in its
-                // selection behavior when added, so enabling the feature
-                // afterward is ignored (was the single-select bug). Order
-                // matches Google's canonical Picker example.
-                if (mode === 'files') {
-                    builder.enableFeature(google.picker.Feature.MULTISELECT_ENABLED);
-                    log('multiselect feature=' + google.picker.Feature.MULTISELECT_ENABLED);
-                }
-                builder.addView(view).setCallback(function(data) {
-                    log('callback action=' + data.action + (data.docs ? ' docs=' + data.docs.length : ''));
-                    if (data.action === google.picker.Action.CANCEL) { redirectToApp({ cancelled: '1' }); return; }
-                    if (data.action !== google.picker.Action.PICKED) return;
-                    if (mode === 'files') {
-                        var files = (data.docs || []).map(function(d) { return { id: d.id, name: d.name }; });
-                        redirectToApp({ files: JSON.stringify(files) });
-                    } else {
+                var view = new google.picker.DocsView().setIncludeFolders(true).setSelectFolderEnabled(true);
+                var picker = new google.picker.PickerBuilder()
+                    .setAppId(APP_ID).setOAuthToken(accessToken).setDeveloperKey(API_KEY)
+                    .setOrigin(window.location.protocol + '//' + window.location.host)
+                    .addView(view)
+                    .setCallback(function(data) {
+                        if (data.action === google.picker.Action.CANCEL) { redirectToApp({ cancelled: '1' }); return; }
+                        if (data.action !== google.picker.Action.PICKED) return;
                         var doc = data.docs[0];
                         if (doc && doc.mimeType === FOLDER_MIME) { redirectToApp({ id: doc.id, name: doc.name }); }
-                    }
-                });
-                var picker = builder.build();
-                log('setVisible(true)');
-                picker.setVisible(true);
-                log('picker shown');
-            } catch (e) {
-                showError('Could not open the picker: ' + (e && e.message ? e.message : e));
+                    });
+                picker.build().setVisible(true);
+            } catch (e) { showError('Could not open the picker: ' + (e && e.message ? e.message : e)); }
+        }
+
+        // ================= FILES MODE (per-file checklist) =================
+        function setupFilesMode() {
+            document.getElementById('heading').textContent = 'Select Your Files';
+            document.getElementById('intro').textContent =
+                'Tap “Select” beside each file to link it. The picker opens to just that file — tap it, and a green check appears here.';
+            document.getElementById('progress').style.display = 'block';
+            renderList();
+            updateProgress();
+            document.getElementById('finishBtn').onclick = finish;
+            window.__enable = function() { renderList(); }; // re-enable Select buttons once ready
+        }
+
+        function ready() { return pickerReady && gisReady; }
+
+        function renderList() {
+            var list = document.getElementById('fileList');
+            list.innerHTML = '';
+            // Already-linked files first (informational ✓), then the ones to pick.
+            haveNames.forEach(function(name) { list.appendChild(row(name, true, false)); });
+            needNames.forEach(function(name) { list.appendChild(row(name, !!picked[name], true)); });
+        }
+        function row(name, done, actionable) {
+            var div = document.createElement('div');
+            div.className = 'fileRow' + (done ? ' done' : '');
+            var label = document.createElement('span');
+            label.className = 'fileName'; label.textContent = name;
+            div.appendChild(label);
+            if (done) {
+                var chk = document.createElement('span');
+                chk.className = 'fileStatus'; chk.textContent = '✓';
+                div.appendChild(chk);
+            } else if (actionable) {
+                var btn = document.createElement('button');
+                btn.className = 'selectBtn'; btn.textContent = 'Select';
+                btn.disabled = !ready();
+                btn.onclick = function() { ensureToken(function() { openFilePicker(name); }); };
+                div.appendChild(btn);
+            }
+            return div;
+        }
+
+        function updateProgress() {
+            var done = needNames.filter(function(n) { return !!picked[n]; }).length;
+            var total = needNames.length;
+            var p = document.getElementById('progress');
+            var allDone = done >= total && total > 0;
+            p.textContent = allDone
+                ? 'All files linked — returning to the app…'
+                : done + ' of ' + total + ' files linked' + (ready() ? '' : ' · loading Google…');
+            if (allDone) {
+                document.getElementById('finishBtn').style.display = 'block';
+                // Auto-return shortly after the last pick (manual Finish as backup).
+                setTimeout(finish, 900);
             }
         }
+
+        function openFilePicker(name) {
+            try {
+                var view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+                    .setMimeTypes('application/json')
+                    .setQuery(name)
+                    .setIncludeFolders(false).setSelectFolderEnabled(false);
+                if (parentFolderId) { view.setParent(parentFolderId); }
+                var picker = new google.picker.PickerBuilder()
+                    .setAppId(APP_ID).setOAuthToken(accessToken).setDeveloperKey(API_KEY)
+                    .setOrigin(window.location.protocol + '//' + window.location.host)
+                    .addView(view)
+                    .setCallback(function(data) {
+                        if (data.action !== google.picker.Action.PICKED) return; // CANCEL → stay on checklist
+                        var doc = (data.docs || [])[0];
+                        if (!doc) return;
+                        if (doc.name !== name) {
+                            showError('That was “' + doc.name + '”. Please pick “' + name + '”.');
+                            return;
+                        }
+                        document.getElementById('error').style.display = 'none';
+                        picked[name] = { id: doc.id, name: doc.name };
+                        log('linked ' + name);
+                        renderList();
+                        updateProgress();
+                    });
+                picker.build().setVisible(true);
+            } catch (e) { showError('Could not open the picker: ' + (e && e.message ? e.message : e)); }
+        }
+
+        function finish() {
+            var files = needNames.filter(function(n){ return !!picked[n]; }).map(function(n){ return picked[n]; });
+            redirectToApp({ files: JSON.stringify(files) });
+        }
+
+        // ---- bootstrap ----
+        if (mode === 'files') { setupFilesMode(); } else { setupFolderMode(); }
+
+        var s1 = document.createElement('script');
+        s1.src = 'https://apis.google.com/js/api.js';
+        s1.onload = function() { log('api.js loaded'); gapi.load('picker', function() { log('picker module loaded'); pickerReady = true; if (window.__enable) window.__enable(); updateProgressSafe(); }); };
+        s1.onerror = function() { showError('Failed to load Google APIs. Check your connection and try again.'); };
+        document.body.appendChild(s1);
+
+        var s2 = document.createElement('script');
+        s2.src = 'https://accounts.google.com/gsi/client';
+        s2.onload = function() { log('GIS loaded'); gisReady = true; if (window.__enable) window.__enable(); updateProgressSafe(); };
+        s2.onerror = function() { showError('Failed to load Google sign-in. Check your connection and try again.'); };
+        document.body.appendChild(s2);
+
+        function updateProgressSafe() { if (mode === 'files') updateProgress(); }
     </script>
 </body>
 </html>
