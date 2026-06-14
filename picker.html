@@ -250,13 +250,15 @@
                 // same name from another folder can appear — the Picker's LIST
                 // view shows a Location column, and the parent check below
                 // rejects a pick from the wrong folder.
-                // Quote the filename for a PHRASE search: "callings.json" looks
-                // for the words adjacent (callings→json), so it won't also match
-                // "callings-archive.json" (callings→archive→json) the way the
-                // bare word search does. (Drive search is word-tokenized.)
+                // Drive search is word-tokenized, so "callings.json" also matches
+                // "callings-archive.json" (shares callings+json). Exclude the
+                // archive sibling with the -archive operator for the active
+                // files; the archive files have the unique word "archive" and
+                // need no exclusion.
+                var q = name.indexOf('archive') === -1 ? name + ' -archive' : name;
                 var view = new google.picker.DocsView(google.picker.ViewId.DOCS)
                     .setMimeTypes('application/json')
-                    .setQuery('"' + name + '"')
+                    .setQuery(q)
                     .setIncludeFolders(false).setSelectFolderEnabled(false);
                 if (google.picker.DocsViewMode && google.picker.DocsViewMode.LIST) {
                     view.setMode(google.picker.DocsViewMode.LIST);
