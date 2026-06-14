@@ -161,7 +161,7 @@
         function setupFilesMode() {
             document.getElementById('heading').textContent = 'Select Your Files';
             document.getElementById('intro').textContent =
-                'Tap “Select” beside each file to link it. The picker opens to just that file — tap it, and a green check appears here.';
+                'Tap “Select” beside a file, then tap that same file in your folder. A green check appears here once it’s linked.';
             document.getElementById('progress').style.display = 'block';
             renderList();
             updateProgress();
@@ -215,9 +215,12 @@
 
         function openFilePicker(name) {
             try {
+                // NO setQuery — the Picker's search is GLOBAL (ignores
+                // setParent) and surfaces same-named files from OTHER folders
+                // (e.g. two config.json), risking linking the wrong file.
+                // setParent scopes the view to ONLY the selected folder.
                 var view = new google.picker.DocsView(google.picker.ViewId.DOCS)
                     .setMimeTypes('application/json')
-                    .setQuery(name)
                     .setIncludeFolders(false).setSelectFolderEnabled(false);
                 if (parentFolderId) { view.setParent(parentFolderId); }
                 var picker = new google.picker.PickerBuilder()
