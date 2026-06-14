@@ -70,6 +70,17 @@
         }
         function csv(s) { return (s || '').split(',').map(function(x){return x.trim();}).filter(Boolean); }
 
+        // Reset every possible scroll root — window.scrollTo alone doesn't always
+        // move the element the Picker anchors to.
+        function scrollTop() {
+            try {
+                window.scrollTo(0, 0);
+                if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+                if (document.documentElement) document.documentElement.scrollTop = 0;
+                if (document.body) document.body.scrollTop = 0;
+            } catch (e) { /* ignore */ }
+        }
+
         function showError(msg) {
             var el = document.getElementById('error');
             el.textContent = msg; el.style.display = 'block';
@@ -196,7 +207,7 @@
                 var btn = document.createElement('button');
                 btn.className = 'selectBtn'; btn.textContent = 'Select';
                 btn.disabled = !ready();
-                btn.onclick = function() { ensureToken(function() { openFilePicker(name); }); };
+                btn.onclick = function() { scrollTop(); ensureToken(function() { openFilePicker(name); }); };
                 div.appendChild(btn);
             }
             return div;
@@ -252,7 +263,7 @@
                 // The Picker dialog anchors to the current scroll position; on a
                 // tall (scrolled) page its top gets clipped. Reset to the top
                 // first so it opens fully in view.
-                try { window.scrollTo(0, 0); } catch (e) { /* ignore */ }
+                scrollTop();
                 // FILTER to just this filename (setQuery) so the user doesn't
                 // scroll. setQuery searches GLOBALLY (ignores setParent), so the
                 // same name from another folder can appear — the Picker's LIST
@@ -263,14 +274,16 @@
                 // like "callings.json" also lists "callings-archive.json"
                 // (shares callings+json). Can't be narrowed further; the pick is
                 // matched by exact name so the right row is linked regardless.
-                // Default (grid) view: on mobile it shows each result's folder
-                // LOCATION (which distinguishes a duplicate name) and doesn't
-                // clip like LIST mode did. Sorting (LIST's only advantage) is
-                // moot here since the query filters to the single file.
+                // LIST mode (user preference): full filename + sortable. On
+                // mobile it shows the name only (no location column) — accepted;
+                // the parent check still rejects a wrong-folder pick.
                 var view = new google.picker.DocsView(google.picker.ViewId.DOCS)
                     .setMimeTypes('application/json')
                     .setQuery(name)
                     .setIncludeFolders(false).setSelectFolderEnabled(false);
+                if (google.picker.DocsViewMode && google.picker.DocsViewMode.LIST) {
+                    view.setMode(google.picker.DocsViewMode.LIST);
+                }
                 var picker = new google.picker.PickerBuilder()
                     .setAppId(APP_ID).setOAuthToken(accessToken).setDeveloperKey(API_KEY)
                     .setOrigin(window.location.protocol + '//' + window.location.host)
@@ -281,6 +294,10 @@
                         if (doc) checkParentThenAccept(doc);
                     });
                 picker.build().setVisible(true);
+                // The Picker can re-scroll the page as it injects its overlay;
+                // pin it back to the top once that settles.
+                setTimeout(scrollTop, 60);
+                setTimeout(scrollTop, 250);
             } catch (e) { showError('Could not open the picker: ' + (e && e.message ? e.message : e)); }
         }
 
