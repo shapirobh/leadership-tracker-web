@@ -8,31 +8,18 @@
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; max-width: 680px; margin: 0 auto; color: #222; }
         h2 { margin-bottom: 4px; }
         .intro { color: #555; margin: 8px 0 16px; line-height: 1.5; }
-        .note { background: #fff8e1; border-left: 4px solid #f5b400; padding: 12px 16px; border-radius: 4px; margin: 16px 0; line-height: 1.5; font-size: 14px; }
-        .note code { font-size: 12px; color: #1a73e8; word-break: break-all; }
         .btn { background: #1a73e8; color: #fff; border: none; padding: 14px 28px; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 16px; min-width: 240px; }
         .btn:disabled { background: #bbb; cursor: default; }
-        #error { color: #EA4335; margin: 16px 0; display: none; }
         #debug { background: #1e1e1e; color: #9cdcfe; font-size: 12px; line-height: 1.6; padding: 12px; border-radius: 6px; white-space: pre-wrap; word-break: break-all; margin-top: 20px; min-height: 40px; }
     </style>
 </head>
 <body>
     <h2 id="heading">Leadership Tracker</h2>
     <p class="intro" id="intro"></p>
-
-    <div class="note" id="folderWarning" style="display:none;">
-        Only share the folder with the <strong>named Google accounts</strong> of your leadership team — never "Anyone with the link."
-    </div>
-    <div class="note" id="filesSteps" style="display:none;">
-        Select <strong>all eight</strong> Leadership Tracker files in this folder:<br>
-        <code>config.json, members.json, callings.json, callings-archive.json, interviews.json, interviews-archive.json, programs.json, programs-archive.json</code>
-    </div>
-
-    <!-- clientId is supplied by the app via the URL hash; hidden, pre-filled below. -->
-    <input id="clientId" type="text" style="display:none;" />
-
-    <button id="go" class="btn" disabled>Loading…</button>
-    <p id="error"></p>
+    <!-- clientId comes from the URL hash; kept as a hidden input so onGo reads it
+         exactly like the working diagnostic page (which read from this input). -->
+    <input id="clientId" type="hidden" />
+    <button id="go" class="btn" disabled>Loading Google APIs…</button>
     <pre id="debug"></pre>
 
     <script>
@@ -60,13 +47,6 @@
             return params;
         }
 
-        function showError(msg) {
-            var el = document.getElementById('error');
-            el.textContent = msg; el.style.display = 'block';
-            var b = document.getElementById('go');
-            b.disabled = true; b.textContent = 'Error';
-        }
-
         function redirectToApp(params) {
             var query = Object.keys(params).map(function(k) {
                 return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
@@ -85,27 +65,13 @@
         var hashParams = getHashParams();
         var mode = hashParams.mode === 'files' ? 'files' : 'folder';
         var parent = hashParams.parent || null;
-        var accessToken = hashParams.token || null;
-        // Pre-fill the (hidden) input so onGo reads the clientId exactly like the
-        // working diagnostic page did.
         document.getElementById('clientId').value = hashParams.clientId || '';
-
         document.getElementById('heading').textContent = mode === 'files' ? 'Select Your Files' : 'Select Your Folder';
-        if (mode === 'files') {
-            document.getElementById('intro').textContent = 'Adopt the existing Leadership Tracker files in your shared folder.';
-            document.getElementById('filesSteps').style.display = 'block';
-        } else {
-            document.getElementById('intro').textContent = 'Choose the Google Drive folder where your unit data is stored.';
-            document.getElementById('folderWarning').style.display = 'block';
-        }
-        dbg('origin=' + window.location.origin + ' mode=' + mode);
+        document.getElementById('intro').textContent = mode === 'files'
+            ? 'Select all eight Leadership Tracker files in your shared folder.'
+            : 'Choose the Google Drive folder where your unit data is stored.';
 
-        var pickerReady = false, gisReady = false, tokenClient = null;
-        // Module-level reference so the built Picker is NOT garbage-collected
-        // during its async iframe setup (a dropped reference nulls the iframe
-        // window -> "postMessage of null" crash several seconds after open).
-        var activePicker = null;
-
+        var pickerReady = false, gisReady = false, tokenClient = null, accessToken = null;
         function maybeEnable() {
             if (pickerReady && gisReady) {
                 var b = document.getElementById('go');
@@ -115,37 +81,39 @@
             }
         }
 
+        dbg('origin=' + window.location.origin + ' mode=' + mode);
+
         var s1 = document.createElement('script');
         s1.src = 'https://apis.google.com/js/api.js';
         s1.onload = function() { dbg('api.js loaded'); gapi.load('picker', function() { dbg('picker module loaded'); pickerReady = true; maybeEnable(); }); };
-        s1.onerror = function() { showError('Failed to load Google APIs. Check your connection and try again.'); };
+        s1.onerror = function() { dbg('⚠ api.js failed to load'); };
         document.body.appendChild(s1);
 
         var s2 = document.createElement('script');
         s2.src = 'https://accounts.google.com/gsi/client';
         s2.onload = function() { dbg('GIS loaded'); gisReady = true; maybeEnable(); };
-        s2.onerror = function() { showError('Failed to load Google sign-in. Check your connection and try again.'); };
+        s2.onerror = function() { dbg('⚠ GIS failed to load'); };
         document.body.appendChild(s2);
 
         function onGo() {
             var clientId = document.getElementById('clientId').value.trim();
-            if (!clientId) { showError('Missing sign-in configuration. Reopen the picker from the app.'); return; }
+            if (!clientId) { dbg('⚠ missing clientId — reopen from the app'); return; }
             try {
                 tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: clientId,
                     scope: DRIVE_SCOPE,
                     callback: function(resp) {
-                        if (resp.error) { showError('Google sign-in failed: ' + resp.error); return; }
+                        if (resp.error) { dbg('⚠ token error: ' + resp.error); return; }
                         accessToken = resp.access_token;
                         dbg('token acquired (' + (accessToken ? accessToken.length : 0) + ' chars)');
                         openPicker();
                     },
-                    error_callback: function(err) { showError('Google sign-in was cancelled or failed. Reload the page to try again.'); dbg('GIS error_callback: ' + JSON.stringify(err)); },
+                    error_callback: function(err) { dbg('⚠ GIS error_callback: ' + JSON.stringify(err)); },
                 });
                 dbg('requesting token…');
                 tokenClient.requestAccessToken({ prompt: '' });
             } catch (e) {
-                showError('Could not start Google sign-in: ' + (e && e.message ? e.message : e));
+                dbg('⚠ initTokenClient threw: ' + (e && e.message ? e.message : e));
             }
         }
 
@@ -166,28 +134,24 @@
                     .setDeveloperKey(API_KEY)
                     .setOrigin(window.location.protocol + '//' + window.location.host)
                     .addView(view)
-                    .setCallback(pickerCallback);
+                    .setCallback(function(data) {
+                        dbg('callback action=' + data.action + (data.docs ? ' docs=' + data.docs.length : ''));
+                        if (data.action !== google.picker.Action.PICKED) return;
+                        if (mode === 'files') {
+                            var files = (data.docs || []).map(function(d) { return { id: d.id, name: d.name }; });
+                            redirectToApp({ files: JSON.stringify(files) });
+                        } else {
+                            var doc = data.docs[0];
+                            if (doc && doc.mimeType === FOLDER_MIME) { redirectToApp({ id: doc.id, name: doc.name }); }
+                        }
+                    });
                 if (mode === 'files') { builder.enableFeature(google.picker.Feature.MULTISELECT_ENABLED); }
-                // Keep the reference (see activePicker note above).
-                activePicker = builder.build();
+                var picker = builder.build();
                 dbg('setVisible(true) — watch the Network tab now');
-                activePicker.setVisible(true);
+                picker.setVisible(true);
                 dbg('picker shown');
             } catch (e) {
                 dbg('⚠ openPicker threw: ' + (e && e.message ? e.message : e));
-                showError('Could not open the picker: ' + (e && e.message ? e.message : e));
-            }
-        }
-
-        function pickerCallback(data) {
-            dbg('callback action=' + data.action + (data.docs ? ' docs=' + data.docs.length : ''));
-            if (data.action !== google.picker.Action.PICKED) return;
-            if (mode === 'files') {
-                var files = (data.docs || []).map(function(d) { return { id: d.id, name: d.name }; });
-                redirectToApp({ files: JSON.stringify(files) });
-            } else {
-                var doc = data.docs[0];
-                if (doc && doc.mimeType === FOLDER_MIME) { redirectToApp({ id: doc.id, name: doc.name }); }
             }
         }
     </script>
