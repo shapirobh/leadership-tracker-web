@@ -5,20 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leadership Tracker — Picker</title>
     <style>
-        /* Body is FULL-WIDTH so the Google Picker (which injects its dialog into
-           <body>) always gets the full viewport. A narrow/centered body squeezed
-           the picker's layout to blank on wider screens. The readable text column
-           lives in .content instead. */
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             margin: 0;
             color: #333;
         }
-        .content {
-            padding: 32px 20px;
-            max-width: 480px;
-            margin: 0 auto;
-        }
+        .content { padding: 32px 20px; max-width: 480px; margin: 0 auto; }
         h2 { text-align: center; margin-bottom: 16px; }
         .intro { text-align: center; color: #555; margin-bottom: 24px; line-height: 1.5; }
         .steps {
@@ -122,14 +114,13 @@
         }
 
         var hashParams = getHashParams();
-        var accessToken = hashParams.token || null;   // legacy fallback token (app-minted)
+        var accessToken = hashParams.token || null;   // legacy fallback token
         var apiKey = hashParams.apiKey;
         var appId = hashParams.appId;
-        var clientId = hashParams.clientId || null;    // Web OAuth client id (GIS flow)
-        // mode: 'folder' (default — pick the shared folder) or 'files' (multi-select
-        // the fixed file set inside `parent`). The app drives which mode it needs.
+        var clientId = hashParams.clientId || null;    // Web OAuth client id (GIS)
         var mode = hashParams.mode === 'files' ? 'files' : 'folder';
         var parent = hashParams.parent || null;
+        var useGis = !!clientId;
 
         // Tailor the copy to the mode.
         if (mode === 'files') {
@@ -145,23 +136,15 @@
             document.getElementById('folderWarning').style.display = 'block';
         }
 
-        // Token strategy:
-        //  - PREFERRED (clientId present): acquire the access token IN THE
-        //    BROWSER via Google Identity Services, so the picker runs with a
-        //    token + session it accepts.
-        //  - FALLBACK (no clientId): use the app-passed token directly.
-        var useGis = !!clientId;
-
-        var pickerReady = false;
-        var authReady = false;
-        var tokenClient = null;
-
-        function enableButton() {
-            if (!(pickerReady && authReady)) return;
-            var btn = document.getElementById('openPickerBtn');
-            btn.disabled = false;
-            btn.textContent = mode === 'files' ? 'Open File Picker' : 'Open Folder Picker';
-            btn.onclick = onPickClicked;
+        // --- Loading + enabling (mirrors the verified-working test page) -------
+        var pickerReady = false, gisReady = false, tokenClient = null;
+        function maybeEnable() {
+            if (!pickerReady) return;
+            if (useGis && !gisReady) return;
+            var b = document.getElementById('openPickerBtn');
+            b.disabled = false;
+            b.textContent = mode === 'files' ? 'Open File Picker' : 'Open Folder Picker';
+            b.onclick = onGo;
         }
 
         if (!apiKey || !appId) {
@@ -171,112 +154,78 @@
         } else if (!useGis && !accessToken) {
             showError('Missing sign-in details. Please update the app and try again.');
         } else {
-            // 1) Picker module via gapi.
-            var gapiScript = document.createElement('script');
-            gapiScript.src = 'https://apis.google.com/js/api.js';
-            gapiScript.onload = function() {
-                gapi.load('picker', function() { pickerReady = true; enableButton(); });
-            };
-            gapiScript.onerror = function() {
-                showError('Failed to load Google APIs. Check your internet connection and try again.');
-            };
-            document.body.appendChild(gapiScript);
+            var s1 = document.createElement('script');
+            s1.src = 'https://apis.google.com/js/api.js';
+            s1.onload = function() { gapi.load('picker', function() { pickerReady = true; maybeEnable(); }); };
+            s1.onerror = function() { showError('Failed to load Google APIs. Check your internet connection and try again.'); };
+            document.body.appendChild(s1);
 
-            // 2) Auth: GIS token client, or straight to ready in the fallback path.
             if (useGis) {
-                var gisScript = document.createElement('script');
-                gisScript.src = 'https://accounts.google.com/gsi/client';
-                // Only mark GIS ready here — do NOT initTokenClient yet. Creating
-                // the token client at load time (while gapi/picker are still
-                // initialising) corrupts the picker's migration shim and makes
-                // setVisible throw "_.zb is not a function". The working test page
-                // creates it on click; mirror that (see onPickClicked).
-                gisScript.onload = function() {
-                    authReady = true;
-                    enableButton();
-                };
-                gisScript.onerror = function() {
-                    showError('Failed to load Google sign-in. Check your internet connection and try again.');
-                };
-                document.body.appendChild(gisScript);
-            } else {
-                authReady = true;
-                enableButton();
+                var s2 = document.createElement('script');
+                s2.src = 'https://accounts.google.com/gsi/client';
+                s2.onload = function() { gisReady = true; maybeEnable(); };
+                s2.onerror = function() { showError('Failed to load Google sign-in. Check your internet connection and try again.'); };
+                document.body.appendChild(s2);
             }
         }
 
-        function onPickClicked() {
-            var btn = document.getElementById('openPickerBtn');
-            btn.disabled = true;
-            if (useGis) {
-                try {
-                    // Create the token client lazily, ON CLICK — gapi/picker have
-                    // fully settled by now, avoiding the load-time GIS↔gapi clash
-                    // that crashed the picker. Matches the working test page.
-                    if (!tokenClient) {
-                        tokenClient = google.accounts.oauth2.initTokenClient({
-                            client_id: clientId,
-                            scope: DRIVE_SCOPE,
-                            callback: handleTokenResponse,
-                            error_callback: function() {
-                                showError('Google sign-in was cancelled or failed. Tap to try again.');
-                                btn.disabled = false;
-                                btn.textContent = 'Try Again';
-                            },
-                        });
-                    }
-                    // prompt '' = reuse an existing grant silently when possible,
-                    // otherwise Google shows the chooser/consent.
-                    tokenClient.requestAccessToken({ prompt: '' });
-                } catch (e) {
-                    showError('Could not start Google sign-in: ' + (e && e.message ? e.message : e));
-                    btn.disabled = false;
-                }
-            } else {
-                buildAndShowPicker();
-            }
-        }
-
-        function handleTokenResponse(resp) {
-            if (resp && resp.error) {
-                showError('Google sign-in failed: ' + resp.error);
-                return;
-            }
-            if (!resp || !resp.access_token) {
-                showError('Google did not return an access token. Please try again.');
-                return;
-            }
-            accessToken = resp.access_token;
-            buildAndShowPicker();
-        }
-
-        function buildAndShowPicker() {
+        // --- Button click: GIS sign-in (on click) then the picker -------------
+        function onGo() {
+            var b = document.getElementById('openPickerBtn');
+            b.disabled = true;
+            if (!useGis) { openPicker(); return; }
             try {
+                if (!tokenClient) {
+                    tokenClient = google.accounts.oauth2.initTokenClient({
+                        client_id: clientId,
+                        scope: DRIVE_SCOPE,
+                        callback: function(resp) {
+                            if (resp && resp.error) { showError('Google sign-in failed: ' + resp.error); return; }
+                            if (!resp || !resp.access_token) { showError('Google did not return an access token. Please try again.'); return; }
+                            accessToken = resp.access_token;
+                            openPicker();
+                        },
+                        error_callback: function() {
+                            showError('Google sign-in was cancelled or failed. Tap to try again.');
+                            b.disabled = false;
+                            b.textContent = 'Try Again';
+                        },
+                    });
+                }
+                tokenClient.requestAccessToken({ prompt: '' });
+            } catch (e) {
+                showError('Could not start Google sign-in: ' + (e && e.message ? e.message : e));
+                b.disabled = false;
+            }
+        }
+
+        // --- Build + show the picker (identical to the working test page) -----
+        function openPicker() {
+            try {
+                var view;
+                if (mode === 'files') {
+                    view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+                        .setParent(parent)
+                        .setMimeTypes('application/json')
+                        .setIncludeFolders(false)
+                        .setSelectFolderEnabled(false);
+                } else {
+                    view = new google.picker.DocsView()
+                        .setIncludeFolders(true)
+                        .setSelectFolderEnabled(true);
+                }
                 var builder = new google.picker.PickerBuilder()
                     .setAppId(appId)
                     .setOAuthToken(accessToken)
                     .setDeveloperKey(apiKey)
                     .setOrigin(window.location.protocol + '//' + window.location.host)
+                    .addView(view)
                     .setCallback(pickerCallback);
-
                 if (mode === 'files') {
-                    // Pre-navigate INTO the shared folder, show only the app's
-                    // JSON files, and allow selecting all of them at once.
-                    var filesView = new google.picker.DocsView(google.picker.ViewId.DOCS)
-                        .setParent(parent)
-                        .setMimeTypes('application/json')
-                        .setIncludeFolders(false)
-                        .setSelectFolderEnabled(false);
-                    builder.addView(filesView)
-                        .enableFeature(google.picker.Feature.MULTISELECT_ENABLED);
-                } else {
-                    var folderView = new google.picker.DocsView()
-                        .setIncludeFolders(true)
-                        .setSelectFolderEnabled(true);
-                    builder.addView(folderView);
+                    builder.enableFeature(google.picker.Feature.MULTISELECT_ENABLED);
                 }
-
-                builder.build().setVisible(true);
+                var picker = builder.build();
+                picker.setVisible(true);
             } catch (e) {
                 showError('Could not open the picker: ' + (e && e.message ? e.message : e));
             }
@@ -284,16 +233,11 @@
 
         function pickerCallback(data) {
             if (data.action !== google.picker.Action.PICKED) return;
-
             if (mode === 'files') {
-                var files = (data.docs || []).map(function(d) {
-                    return { id: d.id, name: d.name };
-                });
+                var files = (data.docs || []).map(function(d) { return { id: d.id, name: d.name }; });
                 redirectToApp({ files: JSON.stringify(files) });
             } else {
                 var doc = data.docs[0];
-                // Only a folder is a valid folder-mode result; ignore a stray
-                // file selection so it can't be returned as a folder id.
                 if (doc && doc.mimeType === FOLDER_MIME) {
                     redirectToApp({ id: doc.id, name: doc.name });
                 }

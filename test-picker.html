@@ -53,7 +53,9 @@
         document.getElementById('goAppPage').onclick = function() {
             var clientId = document.getElementById('clientId').value.trim();
             if (!clientId) { dbg('⚠ enter the Web OAuth Client ID first'); return; }
-            window.location.href = 'picker.html#apiKey=' + encodeURIComponent(API_KEY) +
+            // Cache-bust so the laptop loads the FRESH picker.html (the grey
+            // button otherwise serves a stale cached copy).
+            window.location.href = 'picker.html?v=' + Date.now() + '#apiKey=' + encodeURIComponent(API_KEY) +
                 '&appId=' + encodeURIComponent(APP_ID) +
                 '&clientId=' + encodeURIComponent(clientId) + '&mode=folder';
         };
