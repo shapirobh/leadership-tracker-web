@@ -263,13 +263,14 @@
                 // like "callings.json" also lists "callings-archive.json"
                 // (shares callings+json). Can't be narrowed further; the pick is
                 // matched by exact name so the right row is linked regardless.
+                // Default (grid) view: on mobile it shows each result's folder
+                // LOCATION (which distinguishes a duplicate name) and doesn't
+                // clip like LIST mode did. Sorting (LIST's only advantage) is
+                // moot here since the query filters to the single file.
                 var view = new google.picker.DocsView(google.picker.ViewId.DOCS)
                     .setMimeTypes('application/json')
                     .setQuery(name)
                     .setIncludeFolders(false).setSelectFolderEnabled(false);
-                if (google.picker.DocsViewMode && google.picker.DocsViewMode.LIST) {
-                    view.setMode(google.picker.DocsViewMode.LIST);
-                }
                 var picker = new google.picker.PickerBuilder()
                     .setAppId(APP_ID).setOAuthToken(accessToken).setDeveloperKey(API_KEY)
                     .setOrigin(window.location.protocol + '//' + window.location.host)
