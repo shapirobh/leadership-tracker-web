@@ -80,6 +80,7 @@
                 alreadyLinked: function (n) { return '“' + n + '” is already linked.'; },
                 notInList: function (n) { return '“' + n + '” isn’t one of the Leadership Tracker files.'; },
                 wrongFolder: function (n) { return '“' + n + '” is in a different folder. Please pick the “' + n + '” that is inside the folder you selected.'; },
+                couldNotVerify: function (n) { return 'Couldn’t verify which folder “' + n + '” is in. Please check your connection and try again.'; },
             },
             es: {
                 folderHeading: 'Seleccione su carpeta',
@@ -105,6 +106,7 @@
                 alreadyLinked: function (n) { return '«' + n + '» ya está vinculado.'; },
                 notInList: function (n) { return '«' + n + '» no es uno de los archivos de Leadership Tracker.'; },
                 wrongFolder: function (n) { return '«' + n + '» está en otra carpeta. Elija el «' + n + '» que está dentro de la carpeta que seleccionó.'; },
+                couldNotVerify: function (n) { return 'No se pudo verificar en qué carpeta está «' + n + '». Compruebe su conexión e inténtelo de nuevo.'; },
             },
             pt: {
                 folderHeading: 'Selecione sua pasta',
@@ -130,6 +132,7 @@
                 alreadyLinked: function (n) { return '“' + n + '” já está vinculado.'; },
                 notInList: function (n) { return '“' + n + '” não é um dos arquivos do Leadership Tracker.'; },
                 wrongFolder: function (n) { return '“' + n + '” está em outra pasta. Escolha o “' + n + '” que está dentro da pasta que você selecionou.'; },
+                couldNotVerify: function (n) { return 'Não foi possível verificar em qual pasta “' + n + '” está. Verifique sua conexão e tente novamente.'; },
             },
             fr: {
                 folderHeading: 'Sélectionnez votre dossier',
@@ -155,6 +158,7 @@
                 alreadyLinked: function (n) { return '« ' + n + ' » est déjà relié.'; },
                 notInList: function (n) { return '« ' + n + ' » n’est pas l’un des fichiers Leadership Tracker.'; },
                 wrongFolder: function (n) { return '« ' + n + ' » se trouve dans un autre dossier. Choisissez le « ' + n + ' » qui est dans le dossier que vous avez sélectionné.'; },
+                couldNotVerify: function (n) { return 'Impossible de vérifier dans quel dossier se trouve « ' + n + ' ». Vérifiez votre connexion et réessayez.'; },
             },
         };
 
@@ -188,6 +192,11 @@
         }
 
         function redirectToApp(params) {
+            // Echo the launch nonce on EVERY return (pick / files / cancel). The
+            // app ignores any deep link whose nonce doesn't match the launch it
+            // started, so a forged/stale deep link from another app can't inject
+            // a result. (No-op if the app didn't pass one.)
+            if (nonce) { params.nonce = nonce; }
             var query = Object.keys(params).map(function(k) {
                 return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
             }).join('&');
@@ -204,6 +213,7 @@
         var parentFolderId = hashParams.parent || null;
         var accessToken = hashParams.token || null;
         var loginHint = hashParams.loginHint || null;
+        var nonce = hashParams.nonce || '';   // echoed back so the app trusts only ITS launch
         var needNames = csv(hashParams.need);   // files to acquire (Select button)
         var haveNames = csv(hashParams.have);   // files already linked (shown ✓)
         if (hashParams.clientId) { document.getElementById('clientId').value = hashParams.clientId; }
@@ -361,7 +371,7 @@
             }).then(function(r) { return r.json(); }).then(function(meta) {
                 var parents = (meta && meta.parents) || [];
                 if (parents.indexOf(parentFolderId) !== -1) acceptPick(doc); else rejectWrongFolder(doc.name);
-            }).catch(function() { acceptPick(doc); }); // can't verify → trust the location
+            }).catch(function() { alert(L.couldNotVerify(doc.name)); }); // can't verify → fail CLOSED, don't accept
         }
 
         function openFilePicker(name) {
