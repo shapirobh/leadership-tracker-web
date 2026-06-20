@@ -38,6 +38,7 @@
     <p id="progress" style="display:none;"></p>
     <div id="fileList"></div>
     <button id="finishBtn" class="btn"></button>
+    <div class="note" id="cantFind" style="display:none;"></div>
 
     <p id="error"></p>
 
@@ -81,6 +82,7 @@
                 notInList: function (n) { return '“' + n + '” isn’t one of the Leadership Tracker files.'; },
                 wrongFolder: function (n) { return '“' + n + '” is in a different folder. Please pick the “' + n + '” that is inside the folder you selected.'; },
                 couldNotVerify: function (n) { return 'Couldn’t verify which folder “' + n + '” is in. Please check your connection and try again.'; },
+                cantFind: 'Can’t find a file in the list? Make sure you picked the right shared folder, and that your leader shared it with THIS Google account. If a file is truly missing, ask your leader to check the folder.',
             },
             es: {
                 folderHeading: 'Seleccione su carpeta',
@@ -107,6 +109,7 @@
                 notInList: function (n) { return '«' + n + '» no es uno de los archivos de Leadership Tracker.'; },
                 wrongFolder: function (n) { return '«' + n + '» está en otra carpeta. Elija el «' + n + '» que está dentro de la carpeta que seleccionó.'; },
                 couldNotVerify: function (n) { return 'No se pudo verificar en qué carpeta está «' + n + '». Compruebe su conexión e inténtelo de nuevo.'; },
+                cantFind: '¿No encuentra un archivo en la lista? Asegúrese de haber elegido la carpeta compartida correcta y de que su líder la haya compartido con ESTA cuenta de Google. Si falta un archivo, pídale a su líder que revise la carpeta.',
             },
             pt: {
                 folderHeading: 'Selecione sua pasta',
@@ -133,6 +136,7 @@
                 notInList: function (n) { return '“' + n + '” não é um dos arquivos do Leadership Tracker.'; },
                 wrongFolder: function (n) { return '“' + n + '” está em outra pasta. Escolha o “' + n + '” que está dentro da pasta que você selecionou.'; },
                 couldNotVerify: function (n) { return 'Não foi possível verificar em qual pasta “' + n + '” está. Verifique sua conexão e tente novamente.'; },
+                cantFind: 'Não encontra um arquivo na lista? Verifique se escolheu a pasta compartilhada correta e se seu líder a compartilhou com ESTA conta do Google. Se um arquivo estiver faltando, peça ao seu líder para verificar a pasta.',
             },
             fr: {
                 folderHeading: 'Sélectionnez votre dossier',
@@ -159,6 +163,7 @@
                 notInList: function (n) { return '« ' + n + ' » n’est pas l’un des fichiers Leadership Tracker.'; },
                 wrongFolder: function (n) { return '« ' + n + ' » se trouve dans un autre dossier. Choisissez le « ' + n + ' » qui est dans le dossier que vous avez sélectionné.'; },
                 couldNotVerify: function (n) { return 'Impossible de vérifier dans quel dossier se trouve « ' + n + ' ». Vérifiez votre connexion et réessayez.'; },
+                cantFind: 'Vous ne trouvez pas un fichier ? Vérifiez que vous avez choisi le bon dossier partagé et que votre dirigeant l’a partagé avec CE compte Google. S’il manque un fichier, demandez à votre dirigeant de vérifier le dossier.',
             },
         };
 
@@ -296,6 +301,8 @@
             why.textContent = L.filesWhy; why.style.display = 'block';
             document.getElementById('progress').style.display = 'block';
             document.getElementById('finishBtn').textContent = L.finish;
+            var cf = document.getElementById('cantFind');
+            cf.textContent = L.cantFind; cf.style.display = 'block';
             renderList();
             updateProgress();
             document.getElementById('finishBtn').onclick = finish;
