@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leadership Tracker — Organize callings, interviews, and meeting agendas</title>
+    <title>Leadership Tracker — the companion to Member Tools for callings, interviews, and meeting agendas</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -18,6 +18,8 @@
         .hero { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
         .hero img { width: 96px; height: 96px; border-radius: 20px; }
         .tagline { color: #555; font-size: 1.05rem; margin-top: 0; }
+        .lead { font-size: 1.05rem; }
+        .replaces { background: #f4f1fb; border-left: 4px solid #5b3fb0; padding: 0.75rem 1rem; border-radius: 4px; margin: 1.25rem 0; }
         .footer-links { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid #ddd; font-size: 0.95rem; }
         .footer-links a { margin-right: 1.25rem; }
         ul { padding-left: 1.25rem; }
@@ -30,24 +32,37 @@
         <img src="icon.png" alt="Leadership Tracker app icon">
         <div>
             <h1>Leadership Tracker</h1>
-            <p class="tagline">Organize callings, interviews, and meeting agendas — together, in one place.</p>
+            <p class="tagline">The companion to Member Tools — track callings, interviews, and meeting agendas your whole bishopric shares.</p>
         </div>
     </div>
 
-    <p>Leadership Tracker is a mobile app for local volunteer leadership groups — such as a ward bishopric or
-    stake presidency of The Church of Jesus Christ of Latter-day Saints — to coordinate the work they share.
-    It runs on Android (iOS coming later) and is currently in pre-release testing ahead of its Google Play launch.</p>
+    <p class="lead">Member Tools shows you the <em>current state</em> — your directory and reports. Leadership
+    Tracker tracks the <em>work behind it</em>: a calling moving from approval to set-apart, who's coming due
+    for an interview, and this week's program. It's the app for a ward bishopric or stake presidency of The
+    Church of Jesus Christ of Latter-day Saints to coordinate the work they share — on each leader's own phone,
+    right next to Member Tools.</p>
+
+    <div class="replaces">
+        It replaces two things every bishopric improvises: the <strong>callings &amp; interviews spreadsheet</strong>
+        and the <strong>weekly printed agenda book</strong> — with one shared tracker that's planned ahead, reminds
+        you before things slip, and syncs to your calendar.
+    </div>
+
+    <p class="muted">Runs on Android (iOS coming later) and is currently in pre-release testing ahead of its
+    Google Play launch.</p>
 
     <h2>What the app does</h2>
     <ul>
-        <li><strong>Callings</strong> — track each calling through its full workflow: leadership approval,
-        the invitation interview, sustaining, setting apart, and the record update, with reminders when a
-        step has waited too long.</li>
-        <li><strong>Interviews</strong> — schedule recurring interviews (with rotation between leaders) and
-        one-time appointments, see everything due on a single worklist, and book times against your team's
-        shared calendar so double-booking is visible before it happens.</li>
-        <li><strong>Meeting agendas</strong> — build sacrament and leadership meeting programs: speakers and
-        topics, prayers, hymns, business items, and a printable agenda PDF.</li>
+        <li><strong>Callings</strong> — track each calling from the first decision through leadership approval,
+        the invitation interview, the sustaining, setting apart, and the record update in LCR — with reminders
+        when a step has waited too long. No more spreadsheet that's always out of date.</li>
+        <li><strong>Interviews</strong> — schedule recurring interviews (rotated between leaders) and one-time
+        appointments, see everything due on a single worklist, and sync appointments to your Google Calendar
+        with reminders, so a member who's due never slips through the cracks.</li>
+        <li><strong>Meeting agendas</strong> — plan sacrament and leadership meeting programs <em>weeks ahead</em>
+        instead of Sunday morning: speakers and topics, prayers, hymns, and business items, with a reminder when
+        a slot is still unfilled and a printable agenda PDF. Sustainings and releases from your callings appear on
+        the agenda automatically — no double entry.</li>
         <li><strong>Built for a team</strong> — every member of the leadership group sees the same up-to-date
         information on their own phone, in their own language (English, Spanish, Portuguese, French).</li>
     </ul>
@@ -65,8 +80,9 @@
         appointments to it and reads it so you can see open time slots while scheduling. It only ever touches
         the one calendar you select.</li>
     </ul>
-    <p>No data is ever transmitted to the developer or any third party. You can revoke the app's access at any
-    time from your Google Account settings, and your files remain yours in your own Drive. The app also works
+    <p>No data is ever transmitted to the developer or any third party. You still record final callings in LCR,
+    like always — Leadership Tracker just tracks the work of getting there. You can revoke the app's access at
+    any time from your Google Account settings, and your files remain yours in your own Drive. The app also works
     fully in a device-only mode with no Google account at all.</p>
 
     <h2>Documents</h2>
@@ -78,7 +94,8 @@
     <p>Questions or feedback? Contact <a href="mailto:hazard007@gmail.com">hazard007@gmail.com</a>.</p>
 
     <p class="muted">Leadership Tracker is independently developed software. It is not affiliated with, endorsed
-    by, or sponsored by The Church of Jesus Christ of Latter-day Saints.</p>
+    by, or sponsored by The Church of Jesus Christ of Latter-day Saints. "Member Tools" and "LCR" refer to
+    official Church tools and are used only to describe how this independent app fits alongside them.</p>
 
     <div class="footer-links">
         <a href="privacy.html">Privacy Policy</a>
