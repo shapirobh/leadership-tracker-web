@@ -18,6 +18,7 @@
         .fileRow.done { background: #e9f5ea; border-color: #34A853; }
         .fileName { font-family: monospace; font-size: 13px; word-break: break-all; flex: 1; }
         .fileStatus { font-size: 22px; line-height: 1; color: #34A853; width: 26px; text-align: center; }
+        .stepInstruction { font-size: 17px; line-height: 1.5; margin: 18px 0 10px; }
         .selectBtn { background: #1a73e8; color: #fff; border: none; padding: 9px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; white-space: nowrap; }
         .selectBtn:disabled { background: #bbb; cursor: default; }
         #progress { color: #555; font-size: 14px; margin: 8px 0 12px; }
@@ -67,6 +68,10 @@
                 filesIntro: 'One-time setup to connect this device to your unit’s shared data.',
                 filesWhy: 'Why one file at a time? To keep your information private, Google only lets an app open files you pick yourself. So you grant this app access to each of your unit’s files once, right here — a one-time setup that takes about a minute, and you won’t have to do it again. Tap “Select” next to a file, choose it, and a green check appears. If two files share a name, pick the one inside the folder you selected.',
                 select: 'Select',
+                begin: 'Begin',
+                step: function (d, t, name) { return 'Step ' + d + ' of ' + t + ' — tap the button below, then choose “' + name + '” in Google Drive.'; },
+                chooseThis: function (name) { return 'Choose “' + name + '”'; },
+                gotFile: function (name) { return 'Linked “' + name + '”'; },
                 finish: 'Finish',
                 linked: function (d, t) { return d + ' of ' + t + ' files linked'; },
                 loadingGoogle: ' · loading Google…',
@@ -94,6 +99,10 @@
                 filesIntro: 'Configuración única para conectar este dispositivo a los datos compartidos de su unidad.',
                 filesWhy: '¿Por qué un archivo a la vez? Para mantener su información privada, Google solo permite que una aplicación abra los archivos que usted mismo elige. Por eso concede acceso a cada archivo de su unidad una vez, aquí mismo: una configuración única que toma alrededor de un minuto y que no tendrá que repetir. Toque «Seleccionar» junto a un archivo, elíjalo y aparecerá una marca verde. Si dos archivos tienen el mismo nombre, elija el que está dentro de la carpeta que seleccionó.',
                 select: 'Seleccionar',
+                begin: 'Comenzar',
+                step: function (d, t, name) { return 'Paso ' + d + ' de ' + t + ': toque el botón de abajo y luego elija «' + name + '» en Google Drive.'; },
+                chooseThis: function (name) { return 'Elegir «' + name + '»'; },
+                gotFile: function (name) { return 'Vinculado «' + name + '»'; },
                 finish: 'Finalizar',
                 linked: function (d, t) { return d + ' de ' + t + ' archivos vinculados'; },
                 loadingGoogle: ' · cargando Google…',
@@ -121,6 +130,10 @@
                 filesIntro: 'Configuração única para conectar este dispositivo aos dados compartilhados da sua unidade.',
                 filesWhy: 'Por que um arquivo de cada vez? Para manter suas informações privadas, o Google só permite que um aplicativo abra arquivos que você mesmo escolhe. Então você concede acesso a cada arquivo da sua unidade uma vez, aqui mesmo — uma configuração única que leva cerca de um minuto e que você não precisará repetir. Toque em “Selecionar” ao lado de um arquivo, escolha-o e uma marca verde aparecerá. Se dois arquivos tiverem o mesmo nome, escolha o que está dentro da pasta que você selecionou.',
                 select: 'Selecionar',
+                begin: 'Começar',
+                step: function (d, t, name) { return 'Etapa ' + d + ' de ' + t + ': toque no botão abaixo e escolha "' + name + '" no Google Drive.'; },
+                chooseThis: function (name) { return 'Escolher "' + name + '"'; },
+                gotFile: function (name) { return 'Vinculado "' + name + '"'; },
                 finish: 'Concluir',
                 linked: function (d, t) { return d + ' de ' + t + ' arquivos vinculados'; },
                 loadingGoogle: ' · carregando Google…',
@@ -148,6 +161,10 @@
                 filesIntro: 'Configuration unique pour connecter cet appareil aux données partagées de votre unité.',
                 filesWhy: 'Pourquoi un fichier à la fois ? Pour protéger vos informations, Google n’autorise une application à ouvrir que les fichiers que vous choisissez vous-même. Vous accordez donc l’accès à chacun des fichiers de votre unité une fois, ici même — une configuration unique qui prend environ une minute et que vous n’aurez pas à refaire. Touchez « Sélectionner » à côté d’un fichier, choisissez-le, et une coche verte apparaît. Si deux fichiers portent le même nom, choisissez celui qui se trouve dans le dossier que vous avez sélectionné.',
                 select: 'Sélectionner',
+                begin: 'Commencer',
+                step: function (d, t, name) { return 'Étape ' + d + ' sur ' + t + ' : touchez le bouton ci-dessous, puis choisissez « ' + name + ' » dans Google Drive.'; },
+                chooseThis: function (name) { return 'Choisir « ' + name + ' »'; },
+                gotFile: function (name) { return 'Lié « ' + name + ' »'; },
                 finish: 'Terminer',
                 linked: function (d, t) { return d + ' sur ' + t + ' fichiers reliés'; },
                 loadingGoogle: ' · chargement de Google…',
@@ -293,49 +310,77 @@
             } catch (e) { showError(L.errOpen + (e && e.message ? e.message : e)); }
         }
 
-        // ================= FILES MODE (per-file checklist) =================
+        // ============ FILES MODE (one-at-a-time guided wizard) ============
+        // Walks the joiner through the files ONE at a time, entirely on this page:
+        // an intro (why + Begin), then for each file "choose {name}" → opens the
+        // Picker filtered to it → we validate the pick → "✓ linked, now choose {next}".
+        // The Picker can surface an active/archive name pair; whichever needed file
+        // they pick is accepted and the wizard advances to the next still-needed one.
+        var started = false;   // intro shown until the user taps Begin
+        var lastPicked = null; // the file just linked → "✓ Linked …" confirmation
+
         function setupFilesMode() {
             document.getElementById('heading').textContent = L.filesHeading;
             document.getElementById('intro').textContent = L.filesIntro;
-            var why = document.getElementById('filesWhy');
-            why.textContent = L.filesWhy; why.style.display = 'block';
             document.getElementById('progress').style.display = 'block';
             document.getElementById('finishBtn').textContent = L.finish;
             var cf = document.getElementById('cantFind');
             cf.textContent = L.cantFind; cf.style.display = 'block';
-            renderList();
+            renderStep();
             updateProgress();
             document.getElementById('finishBtn').onclick = finish;
-            window.__enable = function() { renderList(); }; // re-enable Select buttons once ready
+            window.__enable = function() { renderStep(); }; // re-enable the button once Google is ready
         }
 
         function ready() { return pickerReady && gisReady; }
 
-        function renderList() {
+        function nextNeeded() {
+            for (var i = 0; i < needNames.length; i++) { if (!picked[needNames[i]]) return needNames[i]; }
+            return null;
+        }
+
+        function renderStep() {
             var list = document.getElementById('fileList');
             list.innerHTML = '';
-            // Already-linked files first (informational ✓), then the ones to pick.
-            haveNames.forEach(function(name) { list.appendChild(row(name, true, false)); });
-            needNames.forEach(function(name) { list.appendChild(row(name, !!picked[name], true)); });
-        }
-        function row(name, done, actionable) {
-            var div = document.createElement('div');
-            div.className = 'fileRow' + (done ? ' done' : '');
-            var label = document.createElement('span');
-            label.className = 'fileName'; label.textContent = name;
-            div.appendChild(label);
-            if (done) {
-                var chk = document.createElement('span');
-                chk.className = 'fileStatus'; chk.textContent = '✓';
-                div.appendChild(chk);
-            } else if (actionable) {
-                var btn = document.createElement('button');
-                btn.className = 'selectBtn'; btn.textContent = L.select;
-                btn.disabled = !ready();
-                btn.onclick = function() { scrollTop(); ensureToken(function() { openFilePicker(name); }); };
-                div.appendChild(btn);
+            var why = document.getElementById('filesWhy');
+            var done = needNames.filter(function(n){ return !!picked[n]; }).length;
+            var total = needNames.length;
+
+            // Intro: explain the process once, then Begin.
+            if (!started) {
+                why.textContent = L.filesWhy; why.style.display = 'block';
+                var begin = document.createElement('button');
+                begin.className = 'btn'; begin.textContent = L.begin;
+                begin.disabled = !ready();
+                begin.onclick = function() { started = true; renderStep(); };
+                list.appendChild(begin);
+                return;
             }
-            return div;
+            why.style.display = 'none';
+
+            // Confirm the previous pick.
+            if (lastPicked) {
+                var ok = document.createElement('div');
+                ok.className = 'fileRow done';
+                var c = document.createElement('span'); c.className = 'fileStatus'; c.textContent = '✓';
+                var l = document.createElement('span'); l.className = 'fileName'; l.textContent = L.gotFile(lastPicked);
+                ok.appendChild(c); ok.appendChild(l);
+                list.appendChild(ok);
+            }
+
+            var current = nextNeeded();
+            if (!current) return; // all linked — updateProgress() shows the done message + finishes
+
+            var instr = document.createElement('p');
+            instr.className = 'stepInstruction';
+            instr.textContent = L.step(done + 1, total, current);
+            list.appendChild(instr);
+
+            var btn = document.createElement('button');
+            btn.className = 'btn'; btn.textContent = L.chooseThis(current);
+            btn.disabled = !ready();
+            btn.onclick = function() { scrollTop(); ensureToken(function() { openFilePicker(current); }); };
+            list.appendChild(btn);
         }
 
         function updateProgress() {
@@ -359,8 +404,9 @@
             if (needNames.indexOf(nm) === -1) { alert(L.notInList(nm)); return; }
             if (picked[nm] || haveNames.indexOf(nm) !== -1) { alert(L.alreadyLinked(nm)); return; }
             picked[nm] = { id: doc.id, name: nm };
+            lastPicked = nm;
             log('linked ' + nm);
-            renderList();
+            renderStep();
             updateProgress();
         }
         function rejectWrongFolder(nm) { alert(L.wrongFolder(nm)); }
