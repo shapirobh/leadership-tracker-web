@@ -235,6 +235,12 @@
         var parentFolderId = hashParams.parent || null;
         var accessToken = hashParams.token || null;
         var loginHint = hashParams.loginHint || null;
+        // Account mode (app builds that show the native account-confirm step):
+        //   'continue' → sign in via GIS steered to loginHint (browser session
+        //                matches the account; prompts only if no session)
+        //   'change'   → open Google's account chooser
+        //   null       → legacy: reuse the app-passed native token as-is
+        var authMode = hashParams.account || null;
         var nonce = hashParams.nonce || '';   // echoed back so the app trusts only ITS launch
         var needNames = csv(hashParams.need);   // files to acquire (Select button)
         var haveNames = csv(hashParams.have);   // files already linked (shown ✓)
@@ -249,7 +255,13 @@
 
         // ---- token (acquired once; reused for every per-file picker open) ----
         function ensureToken(cb) {
-            if (accessToken) { cb(); return; }
+            // Legacy path (no account mode): reuse the app-passed native token.
+            // With an account mode set, ALWAYS sign in via GIS in the browser —
+            // that establishes a browser session for the chosen account so the
+            // Picker iframe renders as the right account (not whatever the
+            // browser happened to be signed into), which also lets it work in
+            // Safari / any browser, not just an already-signed-in Chrome.
+            if (!authMode && accessToken) { cb(); return; }
             var clientId = document.getElementById('clientId').value.trim();
             if (!clientId) { showError(L.errNoConfig); return; }
             try {
@@ -265,13 +277,17 @@
                         },
                         error_callback: function(err) { showError(L.errCancelled); log('GIS error_callback: ' + JSON.stringify(err)); },
                     };
-                    // login_hint pre-selects the account and (when the browser
-                    // carries the session) skips the chooser on every open.
+                    // login_hint pre-selects the account; 'change' overrides it
+                    // with the chooser below.
                     if (loginHint) { cfg.login_hint = loginHint; }
                     tokenClient = google.accounts.oauth2.initTokenClient(cfg);
                 }
-                log('requesting token…' + (loginHint ? ' (login_hint set)' : ''));
-                tokenClient.requestAccessToken({ prompt: '' });
+                // 'change' → force the account chooser. 'continue' (and the
+                // legacy no-token case) → default prompt: use the session for
+                // login_hint if present, else prompt to sign in for it.
+                var req = authMode === 'change' ? { prompt: 'select_account' } : {};
+                log('requesting token…' + (authMode ? ' (' + authMode + ')' : '') + (loginHint ? ' login_hint' : ''));
+                tokenClient.requestAccessToken(req);
             } catch (e) {
                 showError(L.errStartSignIn + (e && e.message ? e.message : e));
             }
