@@ -282,10 +282,10 @@
                     if (loginHint) { cfg.login_hint = loginHint; }
                     tokenClient = google.accounts.oauth2.initTokenClient(cfg);
                 }
-                // 'change' → force the account chooser. 'continue' (and the
-                // legacy no-token case) → default prompt: use the session for
-                // login_hint if present, else prompt to sign in for it.
-                var req = authMode === 'change' ? { prompt: 'select_account' } : {};
+                // Account mode set → always show Google's account chooser so the
+                // user picks the account in the browser (no app-side prompt).
+                // login_hint (if set) pre-highlights the app's account.
+                var req = authMode ? { prompt: 'select_account' } : {};
                 log('requesting token…' + (authMode ? ' (' + authMode + ')' : '') + (loginHint ? ' login_hint' : ''));
                 tokenClient.requestAccessToken(req);
             } catch (e) {
