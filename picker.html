@@ -252,16 +252,24 @@
 
         var pickerReady = false, gisReady = false, tokenClient = null;
         var picked = {};   // filename -> { id, name }
+        var browserAuthDone = false; // GIS browser sign-in completed once this page load
+        var pendingCb = null;        // callback to run when the in-flight token request returns
 
-        // ---- token (acquired once; reused for every per-file picker open) ----
+        // ---- token: acquired ONCE per page load, then reused for every per-file
+        // picker open. Re-requesting on each file was (a) showing the account
+        // chooser over and over, and (b) — because the tokenClient callback is
+        // bound once at creation — firing a STALE callback, which reopened the
+        // Picker filtered to the FIRST file (config.json) instead of the one just
+        // tapped. Acquire once, reuse; route the callback through pendingCb so it
+        // always runs the LATEST request's continuation, never a stale closure.
         function ensureToken(cb) {
-            // Legacy path (no account mode): reuse the app-passed native token.
-            // With an account mode set, ALWAYS sign in via GIS in the browser —
-            // that establishes a browser session for the chosen account so the
-            // Picker iframe renders as the right account (not whatever the
-            // browser happened to be signed into), which also lets it work in
-            // Safari / any browser, not just an already-signed-in Chrome.
-            if (!authMode && accessToken) { cb(); return; }
+            // Already have a usable token → reuse it, no prompt. Legacy mode uses
+            // the app-passed native token; account mode uses the token from the
+            // one-time in-browser GIS sign-in (which establishes a browser session
+            // for the chosen account so the Picker iframe renders as that account,
+            // and works in Safari / any browser, not just an already-signed-in
+            // Chrome).
+            if (accessToken && (!authMode || browserAuthDone)) { cb(); return; }
             var clientId = document.getElementById('clientId').value.trim();
             if (!clientId) { showError(L.errNoConfig); return; }
             try {
@@ -272,19 +280,21 @@
                         callback: function(resp) {
                             if (resp.error) { showError(L.errSignIn + resp.error); return; }
                             accessToken = resp.access_token;
+                            browserAuthDone = true;
                             log('token acquired (' + (accessToken ? accessToken.length : 0) + ' chars)');
-                            cb();
+                            var f = pendingCb; pendingCb = null; if (f) f();
                         },
                         error_callback: function(err) { showError(L.errCancelled); log('GIS error_callback: ' + JSON.stringify(err)); },
                     };
-                    // login_hint pre-selects the account; 'change' overrides it
-                    // with the chooser below.
+                    // login_hint pre-selects the account.
                     if (loginHint) { cfg.login_hint = loginHint; }
                     tokenClient = google.accounts.oauth2.initTokenClient(cfg);
                 }
-                // Account mode set → always show Google's account chooser so the
-                // user picks the account in the browser (no app-side prompt).
-                // login_hint (if set) pre-highlights the app's account.
+                // First acquisition in account mode → show Google's account chooser
+                // so the user picks the account in the browser (no app-side prompt).
+                // login_hint (if set) pre-highlights the app's account. After this
+                // the guard above short-circuits, so it's a one-time prompt.
+                pendingCb = cb;
                 var req = authMode ? { prompt: 'select_account' } : {};
                 log('requesting token…' + (authMode ? ' (' + authMode + ')' : '') + (loginHint ? ' login_hint' : ''));
                 tokenClient.requestAccessToken(req);
