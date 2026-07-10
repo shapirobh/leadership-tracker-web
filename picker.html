@@ -290,13 +290,21 @@
                     if (loginHint) { cfg.login_hint = loginHint; }
                     tokenClient = google.accounts.oauth2.initTokenClient(cfg);
                 }
-                // First acquisition in account mode → show Google's account chooser
-                // so the user picks the account in the browser (no app-side prompt).
-                // login_hint (if set) pre-highlights the app's account. After this
-                // the guard above short-circuits, so it's a one-time prompt.
                 pendingCb = cb;
-                var req = authMode ? { prompt: 'select_account' } : {};
-                log('requesting token…' + (authMode ? ' (' + authMode + ')' : '') + (loginHint ? ' login_hint' : ''));
+                // The deliberate account choice happens ONCE, on the FOLDER page
+                // (select_account). The FILES page then reuses that just-established
+                // browser session via login_hint with a soft prompt ('') — Google's
+                // account chooser reappears only if there's no session yet (e.g.
+                // files opened without a prior folder pick, like recovery). Net:
+                // pick the account when choosing the folder, then link every file
+                // without being asked again. (Folder + files are separate page
+                // loads but share the browser's session cookies, so the session
+                // set during the folder pick carries into the files page.)
+                var req;
+                if (!authMode) { req = {}; }
+                else if (mode === 'files') { req = { prompt: '' }; }   // soft: reuse session via login_hint
+                else { req = { prompt: 'select_account' }; }           // folder: choose account once
+                log('requesting token…' + (authMode ? ' (' + authMode + '/' + mode + ')' : '') + (loginHint ? ' login_hint' : ''));
                 tokenClient.requestAccessToken(req);
             } catch (e) {
                 showError(L.errStartSignIn + (e && e.message ? e.message : e));
