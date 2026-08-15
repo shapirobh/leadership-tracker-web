@@ -1,7 +1,7 @@
 {
-  "version": "2026-05-30",
-  "generatedAt": "2026-05-30T22:13:03.146Z",
-  "count": 413,
+  "version": "2026-08-15",
+  "generatedAt": "2026-08-15T05:46:15.973Z",
+  "count": 423,
   "hymns": [
     {
       "number": 1,
@@ -1614,6 +1614,46 @@
     {
       "number": 1062,
       "title": "Lord, Accept Our Humble Fast"
+    },
+    {
+      "number": 1063,
+      "title": "Peace, Peace, Be Still"
+    },
+    {
+      "number": 1064,
+      "title": "Great Is Thy Faithfulness"
+    },
+    {
+      "number": 1065,
+      "title": "Isaiah Said"
+    },
+    {
+      "number": 1066,
+      "title": "Fight the Good Fight"
+    },
+    {
+      "number": 1067,
+      "title": "It’s Joyful to Live the Gospel"
+    },
+    {
+      "number": 1068,
+      "title": "To God Be the Glory"
+    },
+    {
+      "number": 1069,
+      "title": "Speak to Us, Lord"
+    },
+    {
+      "number": 1070,
+      "title": "The Miracle"
+    },
+    {
+      "number": 1071,
+      "title": "What God Calls Us To"
+    },
+    {
+      "number": 1072,
+      "title": "When I Survey the Wondrous Cross"
     },
     {
       "number": 1201,
