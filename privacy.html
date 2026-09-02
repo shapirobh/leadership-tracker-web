@@ -34,8 +34,10 @@
     <h2>Google Calendar (optional)</h2>
     <p>If you choose to link a Google calendar, the app requests the <code>calendar.events</code> scope (to create and remove interview appointment events on the calendar you select, and to read that calendar's events so you can see existing appointments while scheduling) and a read-only calendar-list scope (solely to show your calendars in the settings picker). Calendar event data is cached only on your device. The app never touches calendars other than the one you select, and you can unlink the calendar or revoke access at any time.</p>
 
-    <h2>Authentication</h2>
-    <p>Leadership Tracker uses native Google Sign-In (OAuth 2.0). Sign-in tokens are managed by Google Play services on your device. We never see, store, or transmit your Google credentials.</p>
+    <h2>Google Account Authorization</h2>
+    <p><strong>Leadership Tracker has no accounts of its own.</strong> There is no registration, no user database and no server of any kind. Authorizing your Google account (OAuth 2.0) does not create an account with us &mdash; it only grants the app permission to read and write your own content in your own Google Drive and Google Calendar, the same way an email app connects to your mail provider.</p>
+    <p>Access tokens are managed for you by Google Play services on Android and by the Keychain on iOS. We never see, store, or transmit your Google credentials.</p>
+    <p>Using a Google account is <strong>optional</strong>. The app can be used entirely on your device, with no account, no registration and no network &mdash; callings, interviews and meeting agendas all work that way. Authorizing Google unlocks only the two collaboration features: sharing a Drive folder with the rest of your leadership group, and writing appointments to a calendar you select.</p>
 
     <h2>Notifications (optional)</h2>
     <p>Reminders, if you turn them on, are scheduled entirely on your device from the data already in your folder. There are no push servers and nothing is transmitted.</p>
@@ -43,7 +45,7 @@
     <h2>Data Protection &amp; Security</h2>
     <p>We take the protection of your data — including sensitive information such as member contact details and Google Calendar events — seriously, and rely on the following safeguards:</p>
     <ul>
-        <li><strong>Encryption in transit.</strong> All communication between the app and Google's services (Drive, Calendar, and Sign-In) uses HTTPS/TLS. Your data is never transmitted over an unencrypted connection.</li>
+        <li><strong>Encryption in transit.</strong> All communication between the app and Google's services (Drive, Calendar, and account authorization) uses HTTPS/TLS. Your data is never transmitted over an unencrypted connection.</li>
         <li><strong>Encryption at rest.</strong> Your data is stored in your own Google Drive, where Google encrypts it at rest, and in the app's private, sandboxed storage on your device, protected by your device's operating-system security and screen lock.</li>
         <li><strong>Least-privilege access.</strong> The app uses the <code>drive.file</code> scope, which limits its Drive access to only the folder and files you explicitly select or that the app itself creates — it cannot read anything else in your Drive. For Google Calendar, it accesses only the single calendar you choose and never any other calendar.</li>
         <li><strong>Secure credential handling.</strong> Authentication tokens are issued and stored by Google Play services (Android) or the iOS Keychain — never written to the app's own storage and never visible to us. We never see, store, or transmit your Google password.</li>
