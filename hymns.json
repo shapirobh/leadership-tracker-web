@@ -1,7 +1,7 @@
 {
-  "version": "2026-08-15",
-  "generatedAt": "2026-08-15T05:46:15.973Z",
-  "count": 423,
+  "version": "2026-10-29",
+  "generatedAt": "2026-10-29T18:47:50.113Z",
+  "count": 431,
   "hymns": [
     {
       "number": 1,
@@ -1656,6 +1656,30 @@
       "title": "When I Survey the Wondrous Cross"
     },
     {
+      "number": 1073,
+      "title": "Be Thou My Vision"
+    },
+    {
+      "number": 1074,
+      "title": "Our Savior Brings Us Joy"
+    },
+    {
+      "number": 1075,
+      "title": "Jesus Is the Strength of Youth"
+    },
+    {
+      "number": 1076,
+      "title": "How I Love the House of God"
+    },
+    {
+      "number": 1077,
+      "title": "God’s Armor"
+    },
+    {
+      "number": 1078,
+      "title": "Seek Peace"
+    },
+    {
       "number": 1201,
       "title": "Hail the Day That Sees Him Rise"
     },
@@ -1694,6 +1718,14 @@
     {
       "number": 1210,
       "title": "Long Ago, Within a Garden"
+    },
+    {
+      "number": 1211,
+      "title": "O Come, O Come, Emmanuel"
+    },
+    {
+      "number": 1212,
+      "title": "A Quiet Night"
     }
   ]
 }
